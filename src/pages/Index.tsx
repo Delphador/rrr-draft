@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { MadeWithDyad } from "@/components/made-with-dyad";
 import { CHARACTERS, Character } from "@/data/characters";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,9 @@ const Index = () => {
   const [team1Picks, setTeam1Picks] = useState<Character[]>([]);
   const [team2Picks, setTeam2Picks] = useState<Character[]>([]);
   const [currentTurnIndex, setCurrentTurnIndex] = useState(0);
+  const [timer, setTimer] = useState(0);
+  const [isTimerActive, setIsTimerActive] = useState(false);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const currentTurn = useMemo<Turn | null>(() => {
     if (currentTurnIndex < pickBanOrder.length) {
@@ -42,50 +45,11 @@ const Index = () => {
     return null;
   }, [currentTurnIndex]);
 
-  const handleCharacterAction = (character: Character) => {
-    if (!currentTurn) {
-      toast.info("Игра завершена!");
-      return;
+  const getTimerDuration = (turnIndex: number) => {
+    if (turnIndex === 0 || turnIndex === 1) { // Первые два бана
+      return 60;
     }
-
-    const isAlreadySelected = bannedCharacters.some(c => c.id === character.id) ||
-                              team1Picks.some(c => c.id === character.id) ||
-                              team2Picks.some(c => c.id === character.id);
-
-    if (isAlreadySelected) {
-      toast.error("Этот персонаж уже выбран или забанен.");
-      return;
-    }
-
-    if (currentTurn.type === 'ban') {
-      setBannedCharacters(prev => [...prev, character]);
-      toast.success(`${currentTurn.team} забанил ${character.name}.`);
-    } else { // type === 'pick'
-      if (currentTurn.team === 'Team 1') {
-        if (team1Picks.length >= 3) {
-          toast.error("Команда 1 уже выбрала 3 персонажей.");
-          return;
-        }
-        setTeam1Picks(prev => [...prev, character]);
-        toast.success(`${currentTurn.team} выбрал ${character.name}.`);
-      } else { // Team 2
-        if (team2Picks.length >= 3) {
-          toast.error("Команда 2 уже выбрала 3 персонажей.");
-          return;
-        }
-        setTeam2Picks(prev => [...prev, character]);
-        toast.success(`${currentTurn.team} выбрал ${character.name}.`);
-      }
-    }
-    setCurrentTurnIndex(prev => prev + 1);
-  };
-
-  const resetGame = () => {
-    setBannedCharacters([]);
-    setTeam1Picks([]);
-    setTeam2Picks([]);
-    setCurrentTurnIndex(0);
-    toast.info("Игра сброшена.");
+    return 30; // Остальные пики и баны
   };
 
   const availableCharacters = useMemo(() => {
@@ -98,6 +62,110 @@ const Index = () => {
   }, [bannedCharacters, team1Picks, team2Picks]);
 
   const gameEnded = currentTurnIndex >= pickBanOrder.length;
+
+  const resetTimer = (turnIndex: number) => {
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+    }
+    setTimer(getTimerDuration(turnIndex));
+    setIsTimerActive(true);
+  };
+
+  const handleRandomCharacterSelection = () => {
+    if (!currentTurn || availableCharacters.length === 0) {
+      toast.error("Нет доступных персонажей для случайного выбора.");
+      return;
+    }
+
+    const randomIndex = Math.floor(Math.random() * availableCharacters.length);
+    const randomCharacter = availableCharacters[randomIndex];
+    handleCharacterAction(randomCharacter, true);
+  };
+
+  const handleCharacterAction = (character: Character, isRandom: boolean = false) => {
+    if (!currentTurn) {
+      if (!isRandom) toast.info("Игра завершена!");
+      return;
+    }
+
+    const isAlreadySelected = bannedCharacters.some(c => c.id === character.id) ||
+                              team1Picks.some(c => c.id === character.id) ||
+                              team2Picks.some(c => c.id === character.id);
+
+    if (isAlreadySelected) {
+      if (!isRandom) toast.error("Этот персонаж уже выбран или забанен.");
+      return;
+    }
+
+    if (currentTurn.type === 'ban') {
+      setBannedCharacters(prev => [...prev, character]);
+      toast.success(`${currentTurn.team} ${isRandom ? 'автоматически забанил' : 'забанил'} ${character.name}.`);
+    } else { // type === 'pick'
+      if (currentTurn.team === 'Team 1') {
+        if (team1Picks.length >= 3) {
+          if (!isRandom) toast.error("Команда 1 уже выбрала 3 персонажей.");
+          return;
+        }
+        setTeam1Picks(prev => [...prev, character]);
+        toast.success(`${currentTurn.team} ${isRandom ? 'автоматически выбрал' : 'выбрал'} ${character.name}.`);
+      } else { // Team 2
+        if (team2Picks.length >= 3) {
+          if (!isRandom) toast.error("Команда 2 уже выбрала 3 персонажей.");
+          return;
+        }
+        setTeam2Picks(prev => [...prev, character]);
+        toast.success(`${currentTurn.team} ${isRandom ? 'автоматически выбрал' : 'выбрал'} ${character.name}.`);
+      }
+    }
+    setCurrentTurnIndex(prev => prev + 1);
+    setIsTimerActive(false); // Останавливаем таймер до следующего хода
+  };
+
+  const resetGame = () => {
+    setBannedCharacters([]);
+    setTeam1Picks([]);
+    setTeam2Picks([]);
+    setCurrentTurnIndex(0);
+    setIsTimerActive(false);
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+    }
+    setTimer(0);
+    toast.info("Игра сброшена.");
+  };
+
+  // Effect для управления таймером
+  useEffect(() => {
+    if (gameEnded) {
+      setIsTimerActive(false);
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+      return;
+    }
+
+    if (currentTurn && !isTimerActive) {
+      resetTimer(currentTurnIndex);
+    }
+
+    if (isTimerActive && timer > 0) {
+      timerIntervalRef.current = setInterval(() => {
+        setTimer(prev => prev - 1);
+      }, 1000);
+    } else if (timer === 0 && isTimerActive) {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+      toast.warning(`Время для ${currentTurn?.team} истекло! Выбирается случайный персонаж.`);
+      handleRandomCharacterSelection();
+    }
+
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+    };
+  }, [currentTurn, isTimerActive, timer, gameEnded, currentTurnIndex]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
@@ -124,6 +192,9 @@ const Index = () => {
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 Ход {currentTurnIndex + 1} из {pickBanOrder.length}
               </p>
+              <div className="text-5xl font-bold text-red-500 dark:text-red-400 mt-4">
+                {timer}s
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
@@ -194,7 +265,10 @@ const Index = () => {
                 </Card>
               ))}
             </div>
-            <div className="mt-6 text-center">
+            <div className="mt-6 flex justify-center gap-4">
+              <Button onClick={handleRandomCharacterSelection} disabled={!currentTurn || availableCharacters.length === 0} className="bg-yellow-600 hover:bg-yellow-700 text-white">
+                Выбрать случайного персонажа
+              </Button>
               <Button onClick={resetGame} variant="outline" className="text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700">
                 Сбросить игру
               </Button>
