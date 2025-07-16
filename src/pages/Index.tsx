@@ -8,7 +8,8 @@ import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import TeamCompositionDialog from "@/components/TeamCompositionDialog"; // Импортируем новый компонент
+import TeamCompositionDialog from "@/components/TeamCompositionDialog";
+import RoomStateDialog from "@/components/RoomStateDialog"; // Импортируем новый компонент
 
 type TurnAction = 'ban' | 'pick';
 type Team = 'Team 1' | 'Team 2';
@@ -23,6 +24,13 @@ interface GameModeConfig {
   pickBanOrder: Turn[];
   teamPickLimit: number;
   totalBanLimit: number;
+}
+
+interface RegisteredUser {
+  id: string;
+  nickname: string;
+  role: 'captain' | 'spectator';
+  team?: 'Team 1' | 'Team 2';
 }
 
 const gameModes: Record<string, GameModeConfig> = {
@@ -69,7 +77,12 @@ const Index = () => {
   const [nickname, setNickname] = useState('');
   const [selectedRole, setSelectedRole] = useState<'captain' | 'spectator' | ''>('');
   const [selectedTeam, setSelectedTeam] = useState<'Team 1' | 'Team 2' | ''>('');
-  const [registeredCaptains, setRegisteredCaptains] = useState<{ 'Team 1': boolean; 'Team 2': boolean }>({ 'Team 1': false, 'Team 2': false });
+  const [registeredUsers, setRegisteredUsers] = useState<RegisteredUser[]>([]); // Новый стейт для всех пользователей
+
+  const registeredCaptains = useMemo(() => ({
+    'Team 1': registeredUsers.some(u => u.role === 'captain' && u.team === 'Team 1'),
+    'Team 2': registeredUsers.some(u => u.role === 'captain' && u.team === 'Team 2'),
+  }), [registeredUsers]);
 
   const [selectedModeKey, setSelectedModeKey] = useState<string>('3v3');
   const [gameStarted, setGameStarted] = useState(false);
@@ -82,7 +95,8 @@ const Index = () => {
   const [timer, setTimer] = useState(0);
   const [isTimerActive, setIsTimerActive] = useState(false);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const [showTeamCompositionDialog, setShowTeamCompositionDialog] = useState(false); // Новый стейт для диалога
+  const [showTeamCompositionDialog, setShowTeamCompositionDialog] = useState(false);
+  const [showRoomStateDialog, setShowRoomStateDialog] = useState(false); // Новый стейт для диалога комнаты
 
   const currentTurn = useMemo<Turn | null>(() => {
     if (currentTurnIndex < currentModeConfig.pickBanOrder.length) {
@@ -92,10 +106,10 @@ const Index = () => {
   }, [currentTurnIndex, currentModeConfig.pickBanOrder]);
 
   const getTimerDuration = (turnIndex: number) => {
-    if (turnIndex === 0 || turnIndex === 1) { // Первые два бана
+    if (turnIndex === 0 || turnIndex === 1) {
       return 60;
     }
-    return 30; // Остальные пики и баны
+    return 30;
   };
 
   const availableCharacters = useMemo(() => {
@@ -168,7 +182,7 @@ const Index = () => {
       }
     }
     setCurrentTurnIndex(prev => prev + 1);
-    setIsTimerActive(false); // Останавливаем таймер до следующего хода
+    setIsTimerActive(false);
   };
 
   const resetGame = () => {
@@ -182,13 +196,14 @@ const Index = () => {
     }
     setTimer(0);
     setGameStarted(false);
-    setShowTeamCompositionDialog(false); // Скрываем диалог при сбросе
+    setShowTeamCompositionDialog(false);
+    setShowRoomStateDialog(false); // Скрываем диалог комнаты при сбросе
     // Сброс состояния регистрации для полного перезапуска
     setIsUserRegistered(false);
     setNickname('');
     setSelectedRole('');
     setSelectedTeam('');
-    setRegisteredCaptains({ 'Team 1': false, 'Team 2': false });
+    setRegisteredUsers([]); // Очищаем список зарегистрированных пользователей
     toast.info("Игра и регистрация сброшены.");
   };
 
@@ -206,6 +221,12 @@ const Index = () => {
       return;
     }
 
+    const newUser: RegisteredUser = {
+      id: Date.now().toString(), // Простой уникальный ID
+      nickname: nickname.trim(),
+      role: selectedRole,
+    };
+
     if (selectedRole === 'captain') {
       if (!selectedTeam) {
         toast.error("Пожалуйста, выберите команду.");
@@ -215,22 +236,22 @@ const Index = () => {
         toast.error(`Капитан для ${selectedTeam} уже зарегистрирован.`);
         return;
       }
-      setRegisteredCaptains(prev => ({ ...prev, [selectedTeam]: true }));
+      newUser.team = selectedTeam;
+      setRegisteredUsers(prev => [...prev, newUser]);
       toast.success(`Вы зарегистрированы как капитан ${selectedTeam}: ${nickname}`);
     } else { // spectator
+      setRegisteredUsers(prev => [...prev, newUser]);
       toast.success(`Вы зарегистрированы как зритель: ${nickname}`);
     }
     setIsUserRegistered(true);
   };
 
-  // Effect для управления таймером
   useEffect(() => {
-    if (!gameStarted || gameEnded) { // Таймер работает только если игра начата и не завершена
+    if (!gameStarted || gameEnded) {
       setIsTimerActive(false);
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
       }
-      // Если игра завершена, показываем диалог
       if (gameEnded && gameStarted) {
         setShowTeamCompositionDialog(true);
       }
@@ -260,9 +281,8 @@ const Index = () => {
     };
   }, [currentTurn, isTimerActive, timer, gameEnded, currentTurnIndex, gameStarted]);
 
-  // Reset game when mode changes (returns to selection screen)
   useEffect(() => {
-    if (isUserRegistered) { // Only reset game state if user is already registered
+    if (isUserRegistered) {
       resetGame();
     }
   }, [selectedModeKey]);
@@ -335,9 +355,14 @@ const Index = () => {
                   ))}
                 </SelectContent>
               </Select>
-              <Button onClick={handleStartGame} className="bg-blue-600 hover:bg-blue-700 text-white">
-                Начать игру
-              </Button>
+              <div className="flex gap-4">
+                <Button onClick={handleStartGame} className="bg-blue-600 hover:bg-blue-700 text-white">
+                  Начать игру
+                </Button>
+                <Button onClick={() => setShowRoomStateDialog(true)} variant="outline" className="text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700">
+                  Состояние комнаты
+                </Button>
+              </div>
             </div>
           ) : (
             gameEnded ? (
@@ -448,6 +473,12 @@ const Index = () => {
         onClose={() => setShowTeamCompositionDialog(false)}
         team1Picks={team1Picks}
         team2Picks={team2Picks}
+      />
+
+      <RoomStateDialog
+        isOpen={showRoomStateDialog}
+        onClose={() => setShowRoomStateDialog(false)}
+        registeredUsers={registeredUsers}
       />
     </div>
   );
