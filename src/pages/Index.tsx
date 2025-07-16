@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import TeamCompositionDialog from "@/components/TeamCompositionDialog";
 import RoomStatePanel from "@/components/RoomStatePanel";
+import { ThemeToggle } from "@/components/ThemeToggle"; // Импортируем ThemeToggle
 
 type TurnAction = 'ban' | 'pick';
 type Team = 'Team 1' | 'Team 2';
@@ -315,6 +316,9 @@ const Index = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
+      <div className="absolute top-4 left-4">
+        <ThemeToggle /> {/* Добавляем переключатель темы */}
+      </div>
       <div className="text-center mb-8">
         <h1 className="text-4xl font-bold mb-2 text-gray-900 dark:text-gray-100">Капитан Тидус</h1>
         <p className="text-xl text-gray-600 dark:text-gray-400">
