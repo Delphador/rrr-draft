@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import TeamCompositionDialog from "@/components/TeamCompositionDialog";
 import RoomStatePanel from "@/components/RoomStatePanel";
-import GameLogPanel from "@/components/GameLogPanel"; // Import the new component
+import GameLogPanel from "@/components/GameLogPanel";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 type TurnAction = 'ban' | 'pick';
@@ -129,7 +129,7 @@ const Index = () => {
   const handleCharacterAction = useCallback((character: Character, isRandom: boolean = false) => {
     if (!currentTurn) {
       if (!isRandom) toast.info("Игра завершена!");
-      return false; // Indicate failure to advance turn
+      return; // No turn to advance if game is already over
     }
 
     const isAlreadySelected = team1Bans.some(c => c.id === character.id) ||
@@ -137,80 +137,85 @@ const Index = () => {
                               team1Picks.some(c => c.id === character.id) ||
                               team2Picks.some(c => c.id === character.id);
 
+    let logMessage = '';
+    let actionPerformed = false; // Flag to track if a valid ban/pick occurred
+
     if (isAlreadySelected) {
       if (!isRandom) toast.error("Этот персонаж уже выбран или забанен.");
-      return false; // Indicate failure to advance turn
-    }
+    } else if (currentTurn.type === 'ban') {
+      const team1BanLimit = currentModeConfig.pickBanOrder.filter(turn => turn.type === 'ban' && turn.team === 'Team 1').length;
+      const team2BanLimit = currentModeConfig.pickBanOrder.filter(turn => turn.type === 'ban' && turn.team === 'Team 2').length;
 
-    const team1BanLimit = currentModeConfig.pickBanOrder.filter(turn => turn.type === 'ban' && turn.team === 'Team 1').length;
-    const team2BanLimit = currentModeConfig.pickBanOrder.filter(turn => turn.type === 'ban' && turn.team === 'Team 2').length;
-
-    let logMessage = '';
-    let actionSuccessful = false;
-
-    if (currentTurn.type === 'ban') {
       if (currentTurn.team === 'Team 1') {
         if (team1Bans.length >= team1BanLimit) {
           if (!isRandom) toast.error(`Команда 1 уже забанила ${team1BanLimit} персонажей.`);
-          return false;
+        } else {
+          setTeam1Bans(prev => [...prev, character]);
+          logMessage = `${currentTurn.team} ${isRandom ? 'автоматически забанил' : 'забанил'} ${character.name}.`;
+          actionPerformed = true;
         }
-        setTeam1Bans(prev => [...prev, character]);
-        logMessage = `${currentTurn.team} ${isRandom ? 'автоматически забанил' : 'забанил'} ${character.name}.`;
-        actionSuccessful = true;
       } else { // Team 2
         if (team2Bans.length >= team2BanLimit) {
           if (!isRandom) toast.error(`Команда 2 уже забанила ${team2BanLimit} персонажей.`);
-          return false;
+        } else {
+          setTeam2Bans(prev => [...prev, character]);
+          logMessage = `${currentTurn.team} ${isRandom ? 'автоматически забанил' : 'забанил'} ${character.name}.`;
+          actionPerformed = true;
         }
-        setTeam2Bans(prev => [...prev, character]);
-        logMessage = `${currentTurn.team} ${isRandom ? 'автоматически забанил' : 'забанил'} ${character.name}.`;
-        actionSuccessful = true;
       }
     } else { // type === 'pick'
       if (currentTurn.team === 'Team 1') {
         if (team1Picks.length >= currentModeConfig.teamPickLimit) {
           if (!isRandom) toast.error(`Команда 1 уже выбрала ${currentModeConfig.teamPickLimit} персонажей.`);
-          return false;
+        } else {
+          setTeam1Picks(prev => [...prev, character]);
+          logMessage = `${currentTurn.team} ${isRandom ? 'автоматически выбрал' : 'выбрал'} ${character.name}.`;
+          actionPerformed = true;
         }
-        setTeam1Picks(prev => [...prev, character]);
-        logMessage = `${currentTurn.team} ${isRandom ? 'автоматически выбрал' : 'выбрал'} ${character.name}.`;
-        actionSuccessful = true;
       } else { // Team 2
         if (team2Picks.length >= currentModeConfig.teamPickLimit) {
           if (!isRandom) toast.error(`Команда 2 уже выбрала ${currentModeConfig.teamPickLimit} персонажей.`);
-          return false;
+        } else {
+          setTeam2Picks(prev => [...prev, character]);
+          logMessage = `${currentTurn.team} ${isRandom ? 'автоматически выбрал' : 'выбрал'} ${character.name}.`;
+          actionPerformed = true;
         }
-        setTeam2Picks(prev => [...prev, character]);
-        logMessage = `${currentTurn.team} ${isRandom ? 'автоматически выбрал' : 'выбрал'} ${character.name}.`;
-        actionSuccessful = true;
       }
     }
-    if (actionSuccessful) {
+
+    if (actionPerformed) {
       toast.success(logMessage);
-      setGameLog(prev => [...prev, logMessage]); // Add to game log
+      setGameLog(prev => [...prev, logMessage]);
     }
-    return actionSuccessful; // Indicate success to advance turn
+
+    // Always advance the turn after an action attempt (manual or random)
+    setCurrentTurnIndex(prev => prev + 1);
+
   }, [currentTurn, team1Bans, team2Bans, team1Picks, team2Picks, currentModeConfig.pickBanOrder, currentModeConfig.teamPickLimit]);
 
   const handleRandomCharacterSelection = useCallback(() => {
     if (!currentTurn || availableCharacters.length === 0) {
       toast.error("Нет доступных персонажей для случайного выбора.");
-      return false; // Indicate failure
+      // Still advance turn even if no characters are available for random pick
+      setCurrentTurnIndex(prev => prev + 1);
+      return;
     }
 
     // Access control for random selection
     if (selectedRole === 'spectator') {
       toast.error("Зрители не могут делать выбор.");
-      return false;
+      setCurrentTurnIndex(prev => prev + 1); // Spectators can't pick, but turn still advances
+      return;
     }
     if (selectedRole === 'captain' && currentTurn.team !== selectedTeam) {
       toast.error("Сейчас ход другой команды.");
-      return false;
+      setCurrentTurnIndex(prev => prev + 1); // Wrong team, but turn still advances
+      return;
     }
 
     const randomIndex = Math.floor(Math.random() * availableCharacters.length);
     const randomCharacter = availableCharacters[randomIndex];
-    return handleCharacterAction(randomCharacter, true); // Return success/failure from action
+    handleCharacterAction(randomCharacter, true); // This will now handle turn advancement
   }, [currentTurn, availableCharacters, selectedRole, selectedTeam, handleCharacterAction]);
 
   const resetGame = useCallback(() => {
@@ -293,8 +298,7 @@ const Index = () => {
               timerIntervalRef.current = null;
             }
             toast.warning(`Время для ${currentTurn.team} истекло! Выбирается случайный персонаж.`);
-            handleRandomCharacterSelection(); // Attempt random selection
-            setCurrentTurnIndex(prevIndex => prevIndex + 1); // ALWAYS advance the turn after timer expires
+            handleRandomCharacterSelection(); // This call will now handle turn advancement
             return 0;
           }
           return prev - 1;
@@ -517,7 +521,7 @@ const Index = () => {
                 </div>
                 <div className="mt-6 flex justify-center gap-4">
                   <Button
-                    onClick={() => handleRandomCharacterSelection()} // Call directly
+                    onClick={handleRandomCharacterSelection}
                     disabled={!canPerformAction || availableCharacters.length === 0}
                     className="bg-yellow-600 hover:bg-yellow-700 text-white"
                   >
