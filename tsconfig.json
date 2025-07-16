@@ -12,7 +12,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "react-jsx", // Эта строка критически важна для JSX
+    "jsx": "react-jsx",
 
     /* Linting */
     "strict": true,
@@ -26,5 +26,5 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src"] // Убедимся, что все файлы в src включены
+  "include": ["src"]
 }

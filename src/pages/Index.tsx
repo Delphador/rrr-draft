@@ -15,7 +15,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { Progress } from "@/components/ui/progress";
 import ChatPanel from "@/components/ChatPanel";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { XCircle, PlusCircle, Copy } from "lucide-react"; // Import Copy icon
+import { XCircle, PlusCircle, Copy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 type TurnAction = 'ban' | 'pick';
@@ -98,9 +98,9 @@ const Index = () => {
   const [registeredUsers, setRegisteredUsers] = useState<RegisteredUser[]>([]);
   const [roomId, setRoomId] = useState<string | null>(null);
   const [roomName, setRoomName] = useState('');
-  const [roomShortCode, setRoomShortCode] = useState<string | null>(null); // New state for short code
+  const [roomShortCode, setRoomShortCode] = useState<string | null>(null);
   const [isRoomJoined, setIsRoomJoined] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null); // Local user ID for room_users table
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const registeredCaptains = useMemo(() => ({
     'Team 1': registeredUsers.some(u => u.role === 'captain' && u.team === 'Team 1'),
@@ -276,7 +276,7 @@ const Index = () => {
     setGameLog([]);
     setRoomId(null);
     setRoomName('');
-    setRoomShortCode(null); // Reset short code
+    setRoomShortCode(null);
     setIsRoomJoined(false);
     setCurrentUserId(null);
 
@@ -345,7 +345,7 @@ const Index = () => {
     if (data && data.length > 0) {
       setRoomId(data[0].id);
       setRoomName(data[0].name);
-      setRoomShortCode(data[0].short_code); // Set the new short code
+      setRoomShortCode(data[0].short_code);
       setIsRoomJoined(true);
       toast.success(`Комната "${data[0].name}" создана! Код: ${data[0].short_code}`);
     }
@@ -390,7 +390,7 @@ const Index = () => {
 
     setRoomId(roomData.id);
     setRoomName(roomData.name);
-    setRoomShortCode(roomData.short_code); // Set the short code from fetched data
+    setRoomShortCode(roomData.short_code);
     setIsRoomJoined(true);
     toast.success(`Вы присоединились к комнате "${roomData.name}".`);
   };
@@ -429,7 +429,7 @@ const Index = () => {
 
     let newUser: Omit<RegisteredUser, 'id'> & { room_id: string, user_id: string } = {
       room_id: roomId,
-      user_id: crypto.randomUUID(), // Generate a local unique ID for this user session
+      user_id: crypto.randomUUID(),
       nickname: nickname.trim(),
       role: selectedRole,
     };
@@ -458,7 +458,7 @@ const Index = () => {
     }
 
     if (data && data.length > 0) {
-      setCurrentUserId(data[0].id); // Store the ID from the database for this user's entry
+      setCurrentUserId(data[0].id);
       setIsUserRegistered(true);
       toast.success(`Вы зарегистрированы как ${selectedRole === 'captain' ? `капитан ${selectedTeam}` : 'зритель'}: ${nickname}`);
     }
@@ -860,7 +860,7 @@ const Index = () => {
         <RoomStatePanel
           registeredUsers={registeredUsers}
           roomId={roomId}
-          roomShortCode={roomShortCode} {/* Pass short code to panel */}
+          roomShortCode={roomShortCode}
         />
       )}
 
