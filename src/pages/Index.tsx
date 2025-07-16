@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import TeamCompositionDialog from "@/components/TeamCompositionDialog"; // Импортируем новый компонент
 
 type TurnAction = 'ban' | 'pick';
 type Team = 'Team 1' | 'Team 2';
@@ -81,6 +82,7 @@ const Index = () => {
   const [timer, setTimer] = useState(0);
   const [isTimerActive, setIsTimerActive] = useState(false);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [showTeamCompositionDialog, setShowTeamCompositionDialog] = useState(false); // Новый стейт для диалога
 
   const currentTurn = useMemo<Turn | null>(() => {
     if (currentTurnIndex < currentModeConfig.pickBanOrder.length) {
@@ -180,6 +182,7 @@ const Index = () => {
     }
     setTimer(0);
     setGameStarted(false);
+    setShowTeamCompositionDialog(false); // Скрываем диалог при сбросе
     // Сброс состояния регистрации для полного перезапуска
     setIsUserRegistered(false);
     setNickname('');
@@ -226,6 +229,10 @@ const Index = () => {
       setIsTimerActive(false);
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
+      }
+      // Если игра завершена, показываем диалог
+      if (gameEnded && gameStarted) {
+        setShowTeamCompositionDialog(true);
       }
       return;
     }
@@ -435,6 +442,13 @@ const Index = () => {
         )}
       </div>
       <MadeWithDyad />
+
+      <TeamCompositionDialog
+        isOpen={showTeamCompositionDialog}
+        onClose={() => setShowTeamCompositionDialog(false)}
+        team1Picks={team1Picks}
+        team2Picks={team2Picks}
+      />
     </div>
   );
 };
