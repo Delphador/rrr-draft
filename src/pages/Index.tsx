@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import TeamCompositionDialog from "@/components/TeamCompositionDialog";
-import RoomStatePanel from "@/components/RoomStatePanel"; // Импортируем новый компонент (переименованный)
+import RoomStatePanel from "@/components/RoomStatePanel";
 
 type TurnAction = 'ban' | 'pick';
 type Team = 'Team 1' | 'Team 2';
@@ -77,7 +77,7 @@ const Index = () => {
   const [nickname, setNickname] = useState('');
   const [selectedRole, setSelectedRole] = useState<'captain' | 'spectator' | ''>('');
   const [selectedTeam, setSelectedTeam] = useState<'Team 1' | 'Team 2' | ''>('');
-  const [registeredUsers, setRegisteredUsers] = useState<RegisteredUser[]>([]); // Новый стейт для всех пользователей
+  const [registeredUsers, setRegisteredUsers] = useState<RegisteredUser[]>([]);
 
   const registeredCaptains = useMemo(() => ({
     'Team 1': registeredUsers.some(u => u.role === 'captain' && u.team === 'Team 1'),
@@ -136,6 +136,16 @@ const Index = () => {
       return;
     }
 
+    // Access control for random selection
+    if (selectedRole === 'spectator') {
+      toast.error("Зрители не могут делать выбор.");
+      return;
+    }
+    if (selectedRole === 'captain' && currentTurn.team !== selectedTeam) {
+      toast.error("Сейчас ход другой команды.");
+      return;
+    }
+
     const randomIndex = Math.floor(Math.random() * availableCharacters.length);
     const randomCharacter = availableCharacters[randomIndex];
     handleCharacterAction(randomCharacter, true);
@@ -144,6 +154,16 @@ const Index = () => {
   const handleCharacterAction = (character: Character, isRandom: boolean = false) => {
     if (!currentTurn) {
       if (!isRandom) toast.info("Игра завершена!");
+      return;
+    }
+
+    // Access control for manual selection
+    if (selectedRole === 'spectator') {
+      if (!isRandom) toast.error("Зрители не могут делать выбор.");
+      return;
+    }
+    if (selectedRole === 'captain' && currentTurn.team !== selectedTeam) {
+      if (!isRandom) toast.error("Сейчас ход другой команды.");
       return;
     }
 
@@ -284,6 +304,14 @@ const Index = () => {
       resetGame();
     }
   }, [selectedModeKey]);
+
+  // Determine if the current user can perform an action
+  const canPerformAction = useMemo(() => {
+    if (!gameStarted || gameEnded || !currentTurn) return false;
+    if (selectedRole === 'spectator') return false;
+    if (selectedRole === 'captain' && currentTurn.team === selectedTeam) return true;
+    return false;
+  }, [gameStarted, gameEnded, currentTurn, selectedRole, selectedTeam]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
@@ -436,8 +464,12 @@ const Index = () => {
                   {availableCharacters.map(char => (
                     <Card
                       key={char.id}
-                      className="cursor-pointer hover:shadow-md transition-shadow duration-200 bg-white dark:bg-gray-700"
-                      onClick={() => handleCharacterAction(char)}
+                      className={`
+                        cursor-pointer transition-shadow duration-200 
+                        ${canPerformAction ? 'hover:shadow-md' : 'opacity-50 cursor-not-allowed'}
+                        bg-white dark:bg-gray-700
+                      `}
+                      onClick={() => canPerformAction && handleCharacterAction(char)}
                     >
                       <CardContent className="flex flex-col items-center p-4">
                         <img src={char.image} alt={char.name} className="w-16 h-16 object-cover rounded-full mb-2 border-2 border-gray-300 dark:border-gray-600" />
@@ -447,7 +479,11 @@ const Index = () => {
                   ))}
                 </div>
                 <div className="mt-6 flex justify-center gap-4">
-                  <Button onClick={handleRandomCharacterSelection} disabled={!currentTurn || availableCharacters.length === 0} className="bg-yellow-600 hover:bg-yellow-700 text-white">
+                  <Button 
+                    onClick={handleRandomCharacterSelection} 
+                    disabled={!canPerformAction || availableCharacters.length === 0} 
+                    className="bg-yellow-600 hover:bg-yellow-700 text-white"
+                  >
                     Выбрать случайного персонажа
                   </Button>
                   <Button onClick={resetGame} variant="outline" className="text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700">
