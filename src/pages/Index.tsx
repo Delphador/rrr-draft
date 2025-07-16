@@ -63,6 +63,7 @@ const gameModes: Record<string, GameModeConfig> = {
 
 const Index = () => {
   const [selectedModeKey, setSelectedModeKey] = useState<string>('3v3');
+  const [gameStarted, setGameStarted] = useState(false);
   const currentModeConfig = useMemo(() => gameModes[selectedModeKey], [selectedModeKey]);
 
   const [bannedCharacters, setBannedCharacters] = useState<Character[]>([]);
@@ -170,12 +171,19 @@ const Index = () => {
       clearInterval(timerIntervalRef.current);
     }
     setTimer(0);
+    setGameStarted(false); // Возвращаемся к экрану выбора режима
     toast.info("Игра сброшена.");
+  };
+
+  const handleStartGame = () => {
+    setGameStarted(true);
+    // При старте игры, useEffect для selectedModeKey вызовет resetGame,
+    // который уже инициализирует таймер и другие состояния.
   };
 
   // Effect для управления таймером
   useEffect(() => {
-    if (gameEnded) {
+    if (!gameStarted || gameEnded) { // Таймер работает только если игра начата и не завершена
       setIsTimerActive(false);
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
@@ -204,9 +212,9 @@ const Index = () => {
         clearInterval(timerIntervalRef.current);
       }
     };
-  }, [currentTurn, isTimerActive, timer, gameEnded, currentTurnIndex]);
+  }, [currentTurn, isTimerActive, timer, gameEnded, currentTurnIndex, gameStarted]);
 
-  // Reset game when mode changes
+  // Reset game when mode changes (returns to selection screen)
   useEffect(() => {
     resetGame();
   }, [selectedModeKey]);
@@ -214,126 +222,131 @@ const Index = () => {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
       <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold mb-2 text-gray-900 dark:text-gray-100">Rock n Roll Racing: Captain's Mode</h1>
+        <h1 className="text-4xl font-bold mb-2 text-gray-900 dark:text-gray-100">Капитан Тидус</h1>
         <p className="text-xl text-gray-600 dark:text-gray-400">
-          3v3 PvP Character Selection
+          {gameStarted ? currentModeConfig.name : "Выберите режим игры"}
         </p>
       </div>
 
       <div className="w-full max-w-4xl bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-8">
-        <div className="mb-6 flex justify-center items-center gap-4">
-          <label htmlFor="game-mode-select" className="text-lg font-semibold text-gray-800 dark:text-gray-200">Режим игры:</label>
-          <Select value={selectedModeKey} onValueChange={(value) => setSelectedModeKey(value)}>
-            <SelectTrigger id="game-mode-select" className="w-[200px]">
-              <SelectValue placeholder="Выберите режим" />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(gameModes).map(([key, mode]) => (
-                <SelectItem key={key} value={key}>
-                  {mode.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {gameEnded ? (
-          <div className="text-center">
-            <h2 className="text-3xl font-semibold text-green-600 dark:text-green-400 mb-4">Игра завершена!</h2>
-            <p className="text-lg text-gray-700 dark:text-gray-300 mb-4">Все персонажи выбраны и забанены.</p>
-            <Button onClick={resetGame} className="bg-blue-600 hover:bg-blue-700 text-white">Начать заново</Button>
+        {!gameStarted ? (
+          <div className="flex flex-col items-center justify-center gap-6">
+            <label htmlFor="game-mode-select" className="text-lg font-semibold text-gray-800 dark:text-gray-200">Выберите режим игры:</label>
+            <Select value={selectedModeKey} onValueChange={(value) => setSelectedModeKey(value)}>
+              <SelectTrigger id="game-mode-select" className="w-[200px]">
+                <SelectValue placeholder="Выберите режим" />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(gameModes).map(([key, mode]) => (
+                  <SelectItem key={key} value={key}>
+                    {mode.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button onClick={handleStartGame} className="bg-blue-600 hover:bg-blue-700 text-white">
+              Начать игру
+            </Button>
           </div>
         ) : (
-          <>
-            <div className="mb-6 text-center">
-              <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">
-                Текущий ход: <span className="text-blue-600 dark:text-blue-400">{currentTurn?.team}</span> - <span className="text-purple-600 dark:text-purple-400">{currentTurn?.type === 'ban' ? 'Бан' : 'Выбор'}</span>
-              </h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Ход {currentTurnIndex + 1} из {currentModeConfig.pickBanOrder.length}
-              </p>
-              <div className="text-5xl font-bold text-red-500 dark:text-red-400 mt-4">
-                {timer}s
+          gameEnded ? (
+            <div className="text-center">
+              <h2 className="text-3xl font-semibold text-green-600 dark:text-green-400 mb-4">Игра завершена!</h2>
+              <p className="text-lg text-gray-700 dark:text-gray-300 mb-4">Все персонажи выбраны и забанены.</p>
+              <Button onClick={resetGame} className="bg-blue-600 hover:bg-blue-700 text-white">Начать заново</Button>
+            </div>
+          ) : (
+            <>
+              <div className="mb-6 text-center">
+                <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">
+                  Текущий ход: <span className="text-blue-600 dark:text-blue-400">{currentTurn?.team}</span> - <span className="text-purple-600 dark:text-purple-400">{currentTurn?.type === 'ban' ? 'Бан' : 'Выбор'}</span>
+                </h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Ход {currentTurnIndex + 1} из {currentModeConfig.pickBanOrder.length}
+                </p>
+                <div className="text-5xl font-bold text-red-500 dark:text-red-400 mt-4">
+                  {timer}s
+                </div>
               </div>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-              <Card className="bg-gray-50 dark:bg-gray-700">
-                <CardHeader>
-                  <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">Команда 1: Выбрано ({team1Picks.length}/{currentModeConfig.teamPickLimit})</CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-wrap gap-2">
-                  {team1Picks.length > 0 ? (
-                    team1Picks.map(char => (
-                      <Badge key={char.id} variant="default" className="bg-green-500 hover:bg-green-600 text-white">
-                        {char.name}
-                      </Badge>
-                    ))
-                  ) : (
-                    <p className="text-gray-500 dark:text-gray-400">Пока нет выборов</p>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="bg-gray-50 dark:bg-gray-700">
-                <CardHeader>
-                  <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">Команда 2: Выбрано ({team2Picks.length}/{currentModeConfig.teamPickLimit})</CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-wrap gap-2">
-                  {team2Picks.length > 0 ? (
-                    team2Picks.map(char => (
-                      <Badge key={char.id} variant="default" className="bg-blue-500 hover:bg-blue-600 text-white">
-                        {char.name}
-                      </Badge>
-                    ))
-                  ) : (
-                    <p className="text-gray-500 dark:text-gray-400">Пока нет выборов</p>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card className="mb-8 bg-gray-50 dark:bg-gray-700">
-              <CardHeader>
-                <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">Забаненные персонажи ({bannedCharacters.length}/{currentModeConfig.totalBanLimit})</CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-wrap gap-2">
-                {bannedCharacters.length > 0 ? (
-                  bannedCharacters.map(char => (
-                    <Badge key={char.id} variant="destructive" className="bg-red-500 hover:bg-red-600 text-white">
-                      {char.name}
-                    </Badge>
-                  ))
-                ) : (
-                  <p className="text-gray-500 dark:text-gray-400">Пока нет забаненных персонажей</p>
-                )}
-              </CardContent>
-            </Card>
-
-            <h3 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-200">Доступные персонажи</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-              {availableCharacters.map(char => (
-                <Card
-                  key={char.id}
-                  className="cursor-pointer hover:shadow-md transition-shadow duration-200 bg-white dark:bg-gray-700"
-                  onClick={() => handleCharacterAction(char)}
-                >
-                  <CardContent className="flex flex-col items-center p-4">
-                    <img src={char.image} alt={char.name} className="w-16 h-16 object-cover rounded-full mb-2 border-2 border-gray-300 dark:border-gray-600" />
-                    <p className="text-md font-medium text-gray-900 dark:text-gray-100 text-center">{char.name}</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <Card className="bg-gray-50 dark:bg-gray-700">
+                  <CardHeader>
+                    <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">Команда 1: Выбрано ({team1Picks.length}/{currentModeConfig.teamPickLimit})</CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex flex-wrap gap-2">
+                    {team1Picks.length > 0 ? (
+                      team1Picks.map(char => (
+                        <Badge key={char.id} variant="default" className="bg-green-500 hover:bg-green-600 text-white">
+                          {char.name}
+                        </Badge>
+                      ))
+                    ) : (
+                      <p className="text-gray-500 dark:text-gray-400">Пока нет выборов</p>
+                    )}
                   </CardContent>
                 </Card>
-              ))}
-            </div>
-            <div className="mt-6 flex justify-center gap-4">
-              <Button onClick={handleRandomCharacterSelection} disabled={!currentTurn || availableCharacters.length === 0} className="bg-yellow-600 hover:bg-yellow-700 text-white">
-                Выбрать случайного персонажа
-              </Button>
-              <Button onClick={resetGame} variant="outline" className="text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700">
-                Сбросить игру
-              </Button>
-            </div>
-          </>
+
+                <Card className="bg-gray-50 dark:bg-gray-700">
+                  <CardHeader>
+                    <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">Команда 2: Выбрано ({team2Picks.length}/{currentModeConfig.teamPickLimit})</CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex flex-wrap gap-2">
+                    {team2Picks.length > 0 ? (
+                      team2Picks.map(char => (
+                        <Badge key={char.id} variant="default" className="bg-blue-500 hover:bg-blue-600 text-white">
+                          {char.name}
+                        </Badge>
+                      ))
+                    ) : (
+                      <p className="text-gray-500 dark:text-gray-400">Пока нет выборов</p>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card className="mb-8 bg-gray-50 dark:bg-gray-700">
+                <CardHeader>
+                  <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">Забаненные персонажи ({bannedCharacters.length}/{currentModeConfig.totalBanLimit})</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-wrap gap-2">
+                  {bannedCharacters.length > 0 ? (
+                    bannedCharacters.map(char => (
+                      <Badge key={char.id} variant="destructive" className="bg-red-500 hover:bg-red-600 text-white">
+                        {char.name}
+                      </Badge>
+                    ))
+                  ) : (
+                    <p className="text-gray-500 dark:text-gray-400">Пока нет забаненных персонажей</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <h3 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-200">Доступные персонажи</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+                {availableCharacters.map(char => (
+                  <Card
+                    key={char.id}
+                    className="cursor-pointer hover:shadow-md transition-shadow duration-200 bg-white dark:bg-gray-700"
+                    onClick={() => handleCharacterAction(char)}
+                  >
+                    <CardContent className="flex flex-col items-center p-4">
+                      <img src={char.image} alt={char.name} className="w-16 h-16 object-cover rounded-full mb-2 border-2 border-gray-300 dark:border-gray-600" />
+                      <p className="text-md font-medium text-gray-900 dark:text-gray-100 text-center">{char.name}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              <div className="mt-6 flex justify-center gap-4">
+                <Button onClick={handleRandomCharacterSelection} disabled={!currentTurn || availableCharacters.length === 0} className="bg-yellow-600 hover:bg-yellow-700 text-white">
+                  Выбрать случайного персонажа
+                </Button>
+                <Button onClick={resetGame} variant="outline" className="text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700">
+                  Сбросить игру
+                </Button>
+              </div>
+            </>
+          )
         )}
       </div>
       <MadeWithDyad />
