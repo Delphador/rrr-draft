@@ -97,6 +97,7 @@ const Index = () => {
   const [timer, setTimer] = useState(0);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [showTeamCompositionDialog, setShowTeamCompositionDialog] = useState(false);
+  const [gameLog, setGameLog] = useState<string[]>([]); // New state for game log
 
   const currentTurn = useMemo<Turn | null>(() => {
     if (currentTurnIndex < currentModeConfig.pickBanOrder.length) {
@@ -143,6 +144,8 @@ const Index = () => {
     const team1BanLimit = currentModeConfig.pickBanOrder.filter(turn => turn.type === 'ban' && turn.team === 'Team 1').length;
     const team2BanLimit = currentModeConfig.pickBanOrder.filter(turn => turn.type === 'ban' && turn.team === 'Team 2').length;
 
+    let logMessage = '';
+
     if (currentTurn.type === 'ban') {
       if (currentTurn.team === 'Team 1') {
         if (team1Bans.length >= team1BanLimit) {
@@ -150,14 +153,14 @@ const Index = () => {
           return;
         }
         setTeam1Bans(prev => [...prev, character]);
-        toast.success(`${currentTurn.team} ${isRandom ? 'автоматически забанил' : 'забанил'} ${character.name}.`);
+        logMessage = `${currentTurn.team} ${isRandom ? 'автоматически забанил' : 'забанил'} ${character.name}.`;
       } else { // Team 2
         if (team2Bans.length >= team2BanLimit) {
           if (!isRandom) toast.error(`Команда 2 уже забанила ${team2BanLimit} персонажей.`);
           return;
         }
         setTeam2Bans(prev => [...prev, character]);
-        toast.success(`${currentTurn.team} ${isRandom ? 'автоматически забанил' : 'забанил'} ${character.name}.`);
+        logMessage = `${currentTurn.team} ${isRandom ? 'автоматически забанил' : 'забанил'} ${character.name}.`;
       }
     } else { // type === 'pick'
       if (currentTurn.team === 'Team 1') {
@@ -166,16 +169,18 @@ const Index = () => {
           return;
         }
         setTeam1Picks(prev => [...prev, character]);
-        toast.success(`${currentTurn.team} ${isRandom ? 'автоматически выбрал' : 'выбрал'} ${character.name}.`);
+        logMessage = `${currentTurn.team} ${isRandom ? 'автоматически выбрал' : 'выбрал'} ${character.name}.`;
       } else { // Team 2
         if (team2Picks.length >= currentModeConfig.teamPickLimit) {
           if (!isRandom) toast.error(`Команда 2 уже выбрала ${currentModeConfig.teamPickLimit} персонажей.`);
           return;
         }
         setTeam2Picks(prev => [...prev, character]);
-        toast.success(`${currentTurn.team} ${isRandom ? 'автоматически выбрал' : 'выбрал'} ${character.name}.`);
+        logMessage = `${currentTurn.team} ${isRandom ? 'автоматически выбрал' : 'выбрал'} ${character.name}.`;
       }
     }
+    toast.success(logMessage);
+    setGameLog(prev => [...prev, logMessage]); // Add to game log
     setCurrentTurnIndex(prev => prev + 1);
   }, [currentTurn, team1Bans, team2Bans, team1Picks, team2Picks, currentModeConfig.pickBanOrder, currentModeConfig.teamPickLimit]);
 
@@ -193,7 +198,7 @@ const Index = () => {
     if (selectedRole === 'captain' && currentTurn.team !== selectedTeam) {
       toast.error("Сейчас ход другой команды.");
       return;
-    }
+      }
 
     const randomIndex = Math.floor(Math.random() * availableCharacters.length);
     const randomCharacter = availableCharacters[randomIndex];
@@ -218,6 +223,7 @@ const Index = () => {
     setSelectedRole('');
     setSelectedTeam('');
     setRegisteredUsers([]);
+    setGameLog([]); // Reset game log
     toast.info("Игра и регистрация сброшены.");
   }, []);
 
@@ -261,35 +267,33 @@ const Index = () => {
   };
 
   useEffect(() => {
-    // Clear any existing interval on cleanup or if game state changes to inactive
-    if (!gameStarted || gameEnded || !currentTurn) {
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
-        timerIntervalRef.current = null;
-      }
-      if (gameEnded && gameStarted) {
-        setShowTeamCompositionDialog(true);
-      }
-      return;
+    // Clear any existing interval when dependencies change or component unmounts
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
     }
 
-    // If a turn is active and timer is not running, start it
-    if (!timerIntervalRef.current) {
-      setTimer(getTimerDuration(currentTurnIndex)); // Reset timer for new turn
+    // Only start a new timer if the game is active and there's a current turn
+    if (gameStarted && !gameEnded && currentTurn) {
+      setTimer(getTimerDuration(currentTurnIndex)); // Set initial timer for the new turn
       timerIntervalRef.current = setInterval(() => {
         setTimer(prev => {
-          if (prev <= 1) { // If timer is 1 or 0, it's about to expire
+          if (prev <= 1) {
+            // Time's up, perform action and clear interval
             if (timerIntervalRef.current) {
               clearInterval(timerIntervalRef.current);
               timerIntervalRef.current = null;
             }
             toast.warning(`Время для ${currentTurn.team} истекло! Выбирается случайный персонаж.`);
-            handleRandomCharacterSelection();
-            return 0; // Set timer to 0
+            handleRandomCharacterSelection(); // This will advance currentTurnIndex
+            return 0;
           }
           return prev - 1;
         });
       }, 1000);
+    } else if (gameEnded && gameStarted) {
+      // If game ended, show dialog
+      setShowTeamCompositionDialog(true);
     }
 
     // Cleanup function: clear interval when component unmounts or dependencies change
@@ -302,11 +306,13 @@ const Index = () => {
   }, [gameStarted, gameEnded, currentTurn, currentTurnIndex, handleRandomCharacterSelection]);
 
   // Removed the problematic useEffect that called resetGame on isUserRegistered change.
+  // The previous version had this commented out, now it's fully removed.
   // useEffect(() => {
   //   if (isUserRegistered) {
   //     resetGame();
   //   }
   // }, [selectedModeKey, isUserRegistered, resetGame]);
+
 
   // Determine if the current user can perform an action
   const canPerformAction = useMemo(() => {
@@ -322,7 +328,7 @@ const Index = () => {
 
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4"> {/* Changed bg-gray-100 to bg-background */}
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
       <div className="absolute top-4 left-4">
         <ThemeToggle />
       </div>
@@ -333,7 +339,7 @@ const Index = () => {
         </p>
       </div>
 
-      <div className="w-full max-w-4xl bg-card rounded-lg shadow-lg p-6 mb-8"> {/* Changed bg-white to bg-card */}
+      <div className="w-full max-w-4xl bg-card rounded-lg shadow-lg p-6 mb-8">
         {!gameStarted ? ( // First, choose game mode
           <div className="flex flex-col items-center justify-center gap-6">
             <label htmlFor="game-mode-select" className="text-lg font-semibold text-gray-800 dark:text-gray-200">Выберите режим игры:</label>
@@ -418,7 +424,7 @@ const Index = () => {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                  <Card className="bg-secondary"> {/* Changed bg-gray-50 to bg-secondary */}
+                  <Card className="bg-secondary">
                     <CardHeader>
                       <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">Команда 1: Выбрано ({team1Picks.length}/{currentModeConfig.teamPickLimit})</CardTitle>
                     </CardHeader>
@@ -435,7 +441,7 @@ const Index = () => {
                     </CardContent>
                   </Card>
 
-                  <Card className="bg-secondary"> {/* Changed bg-gray-50 to bg-secondary */}
+                  <Card className="bg-secondary">
                     <CardHeader>
                       <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">Команда 2: Выбрано ({team2Picks.length}/{currentModeConfig.teamPickLimit})</CardTitle>
                     </CardHeader>
@@ -455,7 +461,7 @@ const Index = () => {
 
                 {/* New section for Banned Characters */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                  <Card className="bg-secondary"> {/* Changed bg-gray-50 to bg-secondary */}
+                  <Card className="bg-secondary">
                     <CardHeader>
                       <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">Команда 1: Забанено ({team1Bans.length}/{team1BanLimitDisplay})</CardTitle>
                     </CardHeader>
@@ -472,7 +478,7 @@ const Index = () => {
                     </CardContent>
                   </Card>
 
-                  <Card className="bg-secondary"> {/* Changed bg-gray-50 to bg-secondary */}
+                  <Card className="bg-secondary">
                     <CardHeader>
                       <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">Команда 2: Забанено ({team2Bans.length}/{team2BanLimitDisplay})</CardTitle>
                     </CardHeader>
@@ -498,7 +504,7 @@ const Index = () => {
                       className={`
                         cursor-pointer transition-shadow duration-200
                         ${canPerformAction ? 'hover:shadow-md' : 'opacity-50 cursor-not-allowed'}
-                        bg-card {/* Changed bg-white to bg-card */}
+                        bg-card
                       `}
                       onClick={() => canPerformAction && handleCharacterAction(char)}
                     >
@@ -521,6 +527,26 @@ const Index = () => {
                     Сбросить игру
                   </Button>
                 </div>
+
+                {/* New Game Log Section */}
+                {gameStarted && isUserRegistered && (
+                    <Card className="bg-secondary mt-8 w-full max-w-4xl">
+                        <CardHeader>
+                            <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">История драфта</CardTitle>
+                        </CardHeader>
+                        <CardContent className="max-h-60 overflow-y-auto p-4 border rounded-md border-border">
+                            {gameLog.length > 0 ? (
+                                <ul className="list-disc list-inside space-y-1 text-gray-700 dark:text-gray-300">
+                                    {gameLog.map((entry, index) => (
+                                        <li key={index} className="text-sm">{entry}</li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <p className="text-gray-500 dark:text-gray-400 text-sm">История драфта будет отображаться здесь.</p>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
               </>
             )
           )
