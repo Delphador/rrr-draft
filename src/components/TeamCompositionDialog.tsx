@@ -41,7 +41,8 @@ const TeamCompositionDialog: React.FC<TeamCompositionDialogProps> = ({
             <div className="flex flex-wrap gap-2">
               {team1Picks.length > 0 ? (
                 team1Picks.map((char) => (
-                  <Badge key={char.id} variant="default" className="bg-green-500 hover:bg-green-600 text-white">
+                  <Badge key={char.id} variant="default" className="bg-green-500 hover:bg-green-600 text-white flex items-center gap-1 pr-2">
+                    <img src={char.image} alt={char.name} className="w-6 h-6 object-cover rounded-full" />
                     {char.name}
                   </Badge>
                 ))
@@ -55,7 +56,8 @@ const TeamCompositionDialog: React.FC<TeamCompositionDialogProps> = ({
             <div className="flex flex-wrap gap-2">
               {team2Picks.length > 0 ? (
                 team2Picks.map((char) => (
-                  <Badge key={char.id} variant="default" className="bg-blue-500 hover:bg-blue-600 text-white">
+                  <Badge key={char.id} variant="default" className="bg-blue-500 hover:bg-blue-600 text-white flex items-center gap-1 pr-2">
+                    <img src={char.image} alt={char.name} className="w-6 h-6 object-cover rounded-full" />
                     {char.name}
                   </Badge>
                 ))
