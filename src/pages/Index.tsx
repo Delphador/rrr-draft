@@ -15,7 +15,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { Progress } from "@/components/ui/progress";
 import ChatPanel from "@/components/ChatPanel";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { XCircle, PlusCircle } from "lucide-react";
+import { XCircle, PlusCircle, Copy } from "lucide-react"; // Import Copy icon
 import { supabase } from "@/integrations/supabase/client";
 
 type TurnAction = 'ban' | 'pick';
@@ -79,6 +79,17 @@ const gameModes: Record<string, GameModeConfig> = {
   },
 };
 
+// Helper function to generate a random alphanumeric string
+const generateShortCode = (length: number = 6): string => {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  const charactersLength = characters.length;
+  for (let i = 0; i < length; i++) {
+    result += characters.charAt(Math.floor(Math.random() * charactersLength));
+  }
+  return result;
+};
+
 const Index = () => {
   const [isUserRegistered, setIsUserRegistered] = useState(false);
   const [nickname, setNickname] = useState('');
@@ -87,6 +98,7 @@ const Index = () => {
   const [registeredUsers, setRegisteredUsers] = useState<RegisteredUser[]>([]);
   const [roomId, setRoomId] = useState<string | null>(null);
   const [roomName, setRoomName] = useState('');
+  const [roomShortCode, setRoomShortCode] = useState<string | null>(null); // New state for short code
   const [isRoomJoined, setIsRoomJoined] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null); // Local user ID for room_users table
 
@@ -264,6 +276,7 @@ const Index = () => {
     setGameLog([]);
     setRoomId(null);
     setRoomName('');
+    setRoomShortCode(null); // Reset short code
     setIsRoomJoined(false);
     setCurrentUserId(null);
 
@@ -291,9 +304,37 @@ const Index = () => {
       toast.error("Пожалуйста, введите название комнаты.");
       return;
     }
+
+    let newShortCode = generateShortCode();
+    let isUnique = false;
+    // Simple retry mechanism for short code uniqueness (client-side, not robust for high concurrency)
+    for (let i = 0; i < 5; i++) { // Try up to 5 times
+      const { data: existingRoom, error: checkError } = await supabase
+        .from('rooms')
+        .select('id')
+        .eq('short_code', newShortCode)
+        .single();
+
+      if (checkError && checkError.code === 'PGRST116') { // No rows found
+        isUnique = true;
+        break;
+      } else if (existingRoom) {
+        newShortCode = generateShortCode(); // Generate new if collision
+      } else if (checkError) {
+        console.error("Error checking short code uniqueness:", checkError);
+        toast.error("Ошибка при проверке уникальности короткого кода.");
+        return;
+      }
+    }
+
+    if (!isUnique) {
+      toast.error("Не удалось сгенерировать уникальный короткий код. Попробуйте еще раз.");
+      return;
+    }
+
     const { data, error } = await supabase
       .from('rooms')
-      .insert([{ name: roomName.trim() }])
+      .insert([{ name: roomName.trim(), short_code: newShortCode }])
       .select();
 
     if (error) {
@@ -303,30 +344,55 @@ const Index = () => {
     }
     if (data && data.length > 0) {
       setRoomId(data[0].id);
+      setRoomName(data[0].name);
+      setRoomShortCode(data[0].short_code); // Set the new short code
       setIsRoomJoined(true);
-      toast.success(`Комната "${roomName}" создана! ID: ${data[0].id}`);
+      toast.success(`Комната "${data[0].name}" создана! Код: ${data[0].short_code}`);
     }
   };
 
   const handleJoinRoom = async () => {
     if (!roomId || !roomId.trim()) {
-      toast.error("Пожалуйста, введите ID комнаты.");
+      toast.error("Пожалуйста, введите ID или код комнаты.");
       return;
     }
-    const { data, error } = await supabase
-      .from('rooms')
-      .select('name')
-      .eq('id', roomId.trim())
-      .single();
 
-    if (error || !data) {
+    let roomData = null;
+    let error = null;
+
+    // Attempt to join by UUID
+    if (roomId.trim().length === 36 && roomId.trim().includes('-')) { // Basic UUID check
+      const { data, error: uuidError } = await supabase
+        .from('rooms')
+        .select('id, name, short_code')
+        .eq('id', roomId.trim())
+        .single();
+      roomData = data;
+      error = uuidError;
+    }
+
+    // If not found by UUID or it's not a UUID, try by short_code
+    if (!roomData && (!error || error.code === 'PGRST116')) { // PGRST116 means "no rows found"
+      const { data, error: shortCodeError } = await supabase
+        .from('rooms')
+        .select('id, name, short_code')
+        .eq('short_code', roomId.trim())
+        .single();
+      roomData = data;
+      error = shortCodeError;
+    }
+
+    if (error || !roomData) {
       console.error("Error joining room:", error);
-      toast.error("Комната с таким ID не найдена.");
+      toast.error("Комната с таким ID или кодом не найдена.");
       return;
     }
-    setRoomName(data.name);
+
+    setRoomId(roomData.id);
+    setRoomName(roomData.name);
+    setRoomShortCode(roomData.short_code); // Set the short code from fetched data
     setIsRoomJoined(true);
-    toast.success(`Вы присоединились к комнате "${data.name}".`);
+    toast.success(`Вы присоединились к комнате "${roomData.name}".`);
   };
 
   const handleRegister = async () => {
@@ -496,6 +562,15 @@ const Index = () => {
     ));
   };
 
+  const copyToClipboard = (text: string, message: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      toast.success(message);
+    }).catch(err => {
+      console.error('Failed to copy: ', err);
+      toast.error("Не удалось скопировать.");
+    });
+  };
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 to-gray-700 p-4">
       <div className="absolute top-4 left-4">
@@ -531,10 +606,10 @@ const Index = () => {
                 <div className="flex-grow border-t border-gray-300 dark:border-gray-600"></div>
               </div>
               <div>
-                <Label htmlFor="room-id-input" className="mb-2 block text-left">ID существующей комнаты</Label>
+                <Label htmlFor="room-id-input" className="mb-2 block text-left">ID или код существующей комнаты</Label>
                 <Input
                   id="room-id-input"
-                  placeholder="Введите ID комнаты"
+                  placeholder="Введите ID или код комнаты"
                   value={roomId || ''}
                   onChange={(e) => setRoomId(e.target.value)}
                 />
@@ -547,7 +622,20 @@ const Index = () => {
         ) : (
           !gameStarted ? (
             <div className="flex flex-col items-center justify-center gap-6">
-              <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">Комната: {roomName} (ID: {roomId})</h2>
+              <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">Комната: {roomName}</h2>
+              {roomShortCode && (
+                <div className="flex items-center gap-2 text-lg text-gray-700 dark:text-gray-300">
+                  Код комнаты: <span className="font-bold text-primary">{roomShortCode}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => copyToClipboard(roomShortCode, "Код комнаты скопирован!")}
+                    className="h-8 w-8"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
               <label htmlFor="game-mode-select" className="text-lg font-semibold text-gray-800 dark:text-gray-200">Выберите режим игры:</label>
               <Select value={selectedModeKey} onValueChange={(value) => setSelectedModeKey(value)}>
                 <SelectTrigger id="game-mode-select" className="w-[200px]">
@@ -772,6 +860,7 @@ const Index = () => {
         <RoomStatePanel
           registeredUsers={registeredUsers}
           roomId={roomId}
+          roomShortCode={roomShortCode} {/* Pass short code to panel */}
         />
       )}
 
