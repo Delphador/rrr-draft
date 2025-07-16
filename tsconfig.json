@@ -12,7 +12,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "react-jsx", // Убедимся, что JSX правильно обрабатывается
+    "jsx": "react-jsx", // Эта строка критически важна для JSX
 
     /* Linting */
     "strict": true,
@@ -26,6 +26,5 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  "include": ["src"] // Убедимся, что все файлы в src включены
 }
