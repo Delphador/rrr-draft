@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import TeamCompositionDialog from "@/components/TeamCompositionDialog";
-import RoomStateDialog from "@/components/RoomStateDialog"; // Импортируем новый компонент
+import RoomStatePanel from "@/components/RoomStatePanel"; // Импортируем новый компонент (переименованный)
 
 type TurnAction = 'ban' | 'pick';
 type Team = 'Team 1' | 'Team 2';
@@ -96,7 +96,6 @@ const Index = () => {
   const [isTimerActive, setIsTimerActive] = useState(false);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [showTeamCompositionDialog, setShowTeamCompositionDialog] = useState(false);
-  const [showRoomStateDialog, setShowRoomStateDialog] = useState(false); // Новый стейт для диалога комнаты
 
   const currentTurn = useMemo<Turn | null>(() => {
     if (currentTurnIndex < currentModeConfig.pickBanOrder.length) {
@@ -197,7 +196,6 @@ const Index = () => {
     setTimer(0);
     setGameStarted(false);
     setShowTeamCompositionDialog(false);
-    setShowRoomStateDialog(false); // Скрываем диалог комнаты при сбросе
     // Сброс состояния регистрации для полного перезапуска
     setIsUserRegistered(false);
     setNickname('');
@@ -355,14 +353,9 @@ const Index = () => {
                   ))}
                 </SelectContent>
               </Select>
-              <div className="flex gap-4">
-                <Button onClick={handleStartGame} className="bg-blue-600 hover:bg-blue-700 text-white">
-                  Начать игру
-                </Button>
-                <Button onClick={() => setShowRoomStateDialog(true)} variant="outline" className="text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700">
-                  Состояние комнаты
-                </Button>
-              </div>
+              <Button onClick={handleStartGame} className="bg-blue-600 hover:bg-blue-700 text-white">
+                Начать игру
+              </Button>
             </div>
           ) : (
             gameEnded ? (
@@ -475,9 +468,7 @@ const Index = () => {
         team2Picks={team2Picks}
       />
 
-      <RoomStateDialog
-        isOpen={showRoomStateDialog}
-        onClose={() => setShowRoomStateDialog(false)}
+      <RoomStatePanel
         registeredUsers={registeredUsers}
       />
     </div>
