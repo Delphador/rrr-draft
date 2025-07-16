@@ -41,7 +41,7 @@ interface RegisteredUser {
 
 const gameModes: Record<string, GameModeConfig> = {
   '3v3': {
-    name: '3x3 PvP (Капитанский режим)',
+    name: '3x3', // Изменено
     pickBanOrder: [
       { type: 'ban', team: 'Team 1' },
       { type: 'ban', team: 'Team 2' },
@@ -60,7 +60,7 @@ const gameModes: Record<string, GameModeConfig> = {
     totalBanLimit: 6,
   },
   '2v2': {
-    name: '2x2 PvP',
+    name: '2x2', // Изменено
     pickBanOrder: [
       { type: 'ban', team: 'Team 1' },
       { type: 'ban', team: 'Team 2' },
