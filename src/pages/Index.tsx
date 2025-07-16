@@ -195,23 +195,49 @@ const Index = () => {
     return actionSuccessful; // Indicate success/failure
   }, [currentTurn, team1Bans, team2Bans, team1Picks, team2Picks, currentModeConfig.pickBanOrder, currentModeConfig.teamPickLimit]);
 
-  // This function now always advances the turn after attempting a random pick
-  const handleRandomCharacterSelectionAndAdvanceTurn = useCallback(() => {
-    let actionTaken = false;
-    if (!currentTurn || availableCharacters.length === 0) {
-      toast.error("Нет доступных персонажей для случайного выбора.");
-    } else if (selectedRole === 'spectator') {
+  // Function for manual character selection
+  const handleManualCharacterSelection = useCallback((character: Character) => {
+    if (canPerformAction) {
+      if (handleCharacterAction(character, false)) {
+        setCurrentTurnIndex(prev => prev + 1); // Advance turn only if action was successful
+      }
+    } else {
+      toast.error("Вы не можете совершить это действие сейчас.");
+    }
+  }, [canPerformAction, handleCharacterAction]);
+
+  // Function for timer expiry or random pick button
+  const handleTimerExpiryOrRandomPick = useCallback(() => {
+    if (!currentTurn) {
+      toast.info("Игра завершена!");
+      setCurrentTurnIndex(prev => prev + 1); // Still advance to ensure game ends
+      return;
+    }
+
+    // Check if the current user is allowed to trigger this (for the button)
+    // For timer expiry, this check is implicitly handled by the timer only running for the active turn
+    if (selectedRole === 'spectator') {
       toast.error("Зрители не могут делать выбор.");
-    } else if (selectedRole === 'captain' && currentTurn.team !== selectedTeam) {
+      setCurrentTurnIndex(prev => prev + 1);
+      return;
+    }
+    if (selectedRole === 'captain' && currentTurn.team !== selectedTeam) {
       toast.error("Сейчас ход другой команды.");
+      setCurrentTurnIndex(prev => prev + 1);
+      return;
+    }
+
+    if (availableCharacters.length === 0) {
+      toast.error("Нет доступных персонажей для случайного выбора.");
     } else {
       const randomIndex = Math.floor(Math.random() * availableCharacters.length);
       const randomCharacter = availableCharacters[randomIndex];
-      actionTaken = handleCharacterAction(randomCharacter, true); // Perform the action
+      handleCharacterAction(randomCharacter, true); // This will perform the action
     }
     // Always advance the turn after a random selection attempt (successful or not)
     setCurrentTurnIndex(prev => prev + 1);
   }, [currentTurn, availableCharacters, selectedRole, selectedTeam, handleCharacterAction]);
+
 
   const resetGame = useCallback(() => {
     setTeam1Bans([]);
@@ -293,7 +319,7 @@ const Index = () => {
               timerIntervalRef.current = null;
             }
             toast.warning(`Время для ${currentTurn.team} истекло! Выбирается случайный персонаж.`);
-            handleRandomCharacterSelectionAndAdvanceTurn(); // This call will now handle turn advancement
+            handleTimerExpiryOrRandomPick(); // This call will now handle turn advancement
             return 0;
           }
           return prev - 1;
@@ -311,7 +337,7 @@ const Index = () => {
         timerIntervalRef.current = null;
       }
     };
-  }, [gameStarted, gameEnded, currentTurn, currentTurnIndex, handleRandomCharacterSelectionAndAdvanceTurn]);
+  }, [gameStarted, gameEnded, currentTurn, currentTurnIndex, handleTimerExpiryOrRandomPick]);
 
   // Determine if the current user can perform an action
   const canPerformAction = useMemo(() => {
@@ -435,7 +461,8 @@ const Index = () => {
                     <CardContent className="flex flex-wrap gap-2">
                       {team1Picks.length > 0 ? (
                         team1Picks.map(char => (
-                          <Badge key={char.id} variant="default" className="bg-green-500 hover:bg-green-600 text-white">
+                          <Badge key={char.id} variant="default" className="bg-green-500 hover:bg-green-600 text-white flex items-center gap-1 pr-2">
+                            <img src={char.image} alt={char.name} className="w-6 h-6 object-cover rounded-full" />
                             {char.name}
                           </Badge>
                         ))
@@ -452,7 +479,8 @@ const Index = () => {
                     <CardContent className="flex flex-wrap gap-2">
                       {team2Picks.length > 0 ? (
                         team2Picks.map(char => (
-                          <Badge key={char.id} variant="default" className="bg-blue-500 hover:bg-blue-600 text-white">
+                          <Badge key={char.id} variant="default" className="bg-blue-500 hover:bg-blue-600 text-white flex items-center gap-1 pr-2">
+                            <img src={char.image} alt={char.name} className="w-6 h-6 object-cover rounded-full" />
                             {char.name}
                           </Badge>
                         ))
@@ -472,7 +500,8 @@ const Index = () => {
                     <CardContent className="flex flex-wrap gap-2">
                       {team1Bans.length > 0 ? (
                         team1Bans.map(char => (
-                          <Badge key={char.id} variant="destructive" className="bg-red-500 hover:bg-red-600 text-white">
+                          <Badge key={char.id} variant="destructive" className="bg-red-500 hover:bg-red-600 text-white flex items-center gap-1 pr-2">
+                            <img src={char.image} alt={char.name} className="w-6 h-6 object-cover rounded-full" />
                             {char.name}
                           </Badge>
                         ))
@@ -489,7 +518,8 @@ const Index = () => {
                     <CardContent className="flex flex-wrap gap-2">
                       {team2Bans.length > 0 ? (
                         team2Bans.map(char => (
-                          <Badge key={char.id} variant="destructive" className="bg-red-500 hover:bg-red-600 text-white">
+                          <Badge key={char.id} variant="destructive" className="bg-red-500 hover:bg-red-600 text-white flex items-center gap-1 pr-2">
+                            <img src={char.image} alt={char.name} className="w-6 h-6 object-cover rounded-full" />
                             {char.name}
                           </Badge>
                         ))
@@ -510,11 +540,7 @@ const Index = () => {
                         ${canPerformAction ? 'hover:shadow-lg hover:border-primary' : 'opacity-50 cursor-not-allowed'}
                         bg-card border-2 border-transparent
                       `}
-                      onClick={() => {
-                        if (canPerformAction && handleCharacterAction(char)) {
-                          setCurrentTurnIndex(prev => prev + 1); // Advance turn only if action was successful
-                        }
-                      }}
+                      onClick={() => handleManualCharacterSelection(char)}
                     >
                       <CardContent className="flex flex-col items-center p-4">
                         <img src={char.image} alt={char.name} className="w-16 h-16 object-cover rounded-full mb-2 border-2 border-gray-300 dark:border-gray-600" />
@@ -525,7 +551,7 @@ const Index = () => {
                 </div>
                 <div className="mt-6 flex justify-center gap-4">
                   <Button
-                    onClick={handleRandomCharacterSelectionAndAdvanceTurn}
+                    onClick={handleTimerExpiryOrRandomPick}
                     disabled={!canPerformAction || availableCharacters.length === 0}
                     className="bg-yellow-600 hover:bg-yellow-700 text-white"
                   >
