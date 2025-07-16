@@ -41,7 +41,7 @@ interface RegisteredUser {
 
 const gameModes: Record<string, GameModeConfig> = {
   '3v3': {
-    name: '3x3', // Изменено
+    name: '3x3',
     pickBanOrder: [
       { type: 'ban', team: 'Team 1' },
       { type: 'ban', team: 'Team 2' },
@@ -60,7 +60,7 @@ const gameModes: Record<string, GameModeConfig> = {
     totalBanLimit: 6,
   },
   '2v2': {
-    name: '2x2', // Изменено
+    name: '2x2',
     pickBanOrder: [
       { type: 'ban', team: 'Team 1' },
       { type: 'ban', team: 'Team 2' },
@@ -274,6 +274,12 @@ const Index = () => {
       return;
     }
 
+    // Check for unique nickname
+    if (registeredUsers.some(u => u.nickname.toLowerCase() === nickname.trim().toLowerCase())) {
+      toast.error("Этот никнейм уже используется.");
+      return;
+    }
+
     const newUser: RegisteredUser = {
       id: Date.now().toString(),
       nickname: nickname.trim(),
@@ -379,9 +385,24 @@ const Index = () => {
                 ))}
               </SelectContent>
             </Select>
-            <Button onClick={handleStartGame} className="bg-blue-600 hover:bg-blue-700 text-white">
+            <Button onClick={handleStartGame} className="bg-red-600 hover:bg-red-700 text-white text-lg px-8 py-4 mt-4">
               Начать игру
             </Button>
+            <Card className="mt-8 p-4 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
+              <CardHeader className="p-0 pb-2">
+                <CardTitle className="text-xl font-bold text-center text-gray-800 dark:text-gray-200">Как играть?</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0 text-gray-700 dark:text-gray-300 text-sm text-left">
+                <ul className="list-disc list-inside space-y-1">
+                  <li>Выберите режим игры (2x2 или 3x3).</li>
+                  <li>Нажмите "Начать игру".</li>
+                  <li>Зарегистрируйтесь как "Капитан" или "Зритель".</li>
+                  <li>Капитаны по очереди банят и выбирают персонажей.</li>
+                  <li>Если время хода истекает, персонаж выбирается автоматически.</li>
+                  <li>Следите за историей драфта и составами команд в панелях.</li>
+                </ul>
+              </CardContent>
+            </Card>
           </div>
         ) : (
           !isUserRegistered ? (
@@ -421,7 +442,7 @@ const Index = () => {
                     </Select>
                   </>
                 )}
-                <Button onClick={handleRegister} className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+                <Button onClick={handleRegister} className="w-full bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 text-white shadow-lg hover:shadow-xl">
                   Зарегистрироваться
                 </Button>
               </div>
@@ -526,8 +547,8 @@ const Index = () => {
                       <TooltipTrigger asChild>
                         <Card
                           className={`
-                            cursor-pointer transition-all duration-200
-                            ${canPerformAction ? 'hover:shadow-lg hover:border-primary' : 'opacity-50 cursor-not-allowed'}
+                            cursor-pointer transition-all duration-200 transform
+                            ${canPerformAction ? 'hover:shadow-lg hover:border-primary hover:scale-105' : 'opacity-50 cursor-not-allowed'}
                             bg-card border-2 border-transparent
                           `}
                           onClick={() => handleManualCharacterSelection(char)}
