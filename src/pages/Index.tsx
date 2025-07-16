@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { MadeWithDyad } from "@/components/made-with-dyad";
 import { CHARACTERS, Character } from "@/data/characters";
 import { Button } from "@/components/ui/button";
@@ -89,13 +89,12 @@ const Index = () => {
   const [gameStarted, setGameStarted] = useState(false);
   const currentModeConfig = useMemo(() => gameModes[selectedModeKey], [selectedModeKey]);
 
-  const [team1Bans, setTeam1Bans] = useState<Character[]>([]); // New state for Team 1 bans
-  const [team2Bans, setTeam2Bans] = useState<Character[]>([]); // New state for Team 2 bans
+  const [team1Bans, setTeam1Bans] = useState<Character[]>([]);
+  const [team2Bans, setTeam2Bans] = useState<Character[]>([]);
   const [team1Picks, setTeam1Picks] = useState<Character[]>([]);
   const [team2Picks, setTeam2Picks] = useState<Character[]>([]);
   const [currentTurnIndex, setCurrentTurnIndex] = useState(0);
   const [timer, setTimer] = useState(0);
-  const [isTimerActive, setIsTimerActive] = useState(false);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [showTeamCompositionDialog, setShowTeamCompositionDialog] = useState(false);
 
@@ -115,58 +114,19 @@ const Index = () => {
 
   const availableCharacters = useMemo(() => {
     const allSelectedIds = new Set([
-      ...team1Bans.map(c => c.id), // Include Team 1 bans
-      ...team2Bans.map(c => c.id), // Include Team 2 bans
+      ...team1Bans.map(c => c.id),
+      ...team2Bans.map(c => c.id),
       ...team1Picks.map(c => c.id),
       ...team2Picks.map(c => c.id),
     ]);
     return CHARACTERS.filter(char => !allSelectedIds.has(char.id));
-  }, [team1Bans, team2Bans, team1Picks, team2Picks]); // Update dependencies
+  }, [team1Bans, team2Bans, team1Picks, team2Picks]);
 
   const gameEnded = currentTurnIndex >= currentModeConfig.pickBanOrder.length;
 
-  const resetTimer = (turnIndex: number) => {
-    if (timerIntervalRef.current) {
-      clearInterval(timerIntervalRef.current);
-    }
-    setTimer(getTimerDuration(turnIndex));
-    setIsTimerActive(true);
-  };
-
-  const handleRandomCharacterSelection = () => {
-    if (!currentTurn || availableCharacters.length === 0) {
-      toast.error("Нет доступных персонажей для случайного выбора.");
-      return;
-    }
-
-    // Access control for random selection
-    if (selectedRole === 'spectator') {
-      toast.error("Зрители не могут делать выбор.");
-      return;
-    }
-    if (selectedRole === 'captain' && currentTurn.team !== selectedTeam) {
-      toast.error("Сейчас ход другой команды.");
-      return;
-    }
-
-    const randomIndex = Math.floor(Math.random() * availableCharacters.length);
-    const randomCharacter = availableCharacters[randomIndex];
-    handleCharacterAction(randomCharacter, true);
-  };
-
-  const handleCharacterAction = (character: Character, isRandom: boolean = false) => {
+  const handleCharacterAction = useCallback((character: Character, isRandom: boolean = false) => {
     if (!currentTurn) {
       if (!isRandom) toast.info("Игра завершена!");
-      return;
-    }
-
-    // Access control for manual selection
-    if (selectedRole === 'spectator') {
-      if (!isRandom) toast.error("Зрители не могут делать выбор.");
-      return;
-    }
-    if (selectedRole === 'captain' && currentTurn.team !== selectedTeam) {
-      if (!isRandom) toast.error("Сейчас ход другой команды.");
       return;
     }
 
@@ -180,7 +140,6 @@ const Index = () => {
       return;
     }
 
-    // Calculate team-specific ban limits based on pickBanOrder
     const team1BanLimit = currentModeConfig.pickBanOrder.filter(turn => turn.type === 'ban' && turn.team === 'Team 1').length;
     const team2BanLimit = currentModeConfig.pickBanOrder.filter(turn => turn.type === 'ban' && turn.team === 'Team 2').length;
 
@@ -218,30 +177,49 @@ const Index = () => {
       }
     }
     setCurrentTurnIndex(prev => prev + 1);
-    setIsTimerActive(false);
-  };
+  }, [currentTurn, team1Bans, team2Bans, team1Picks, team2Picks, currentModeConfig.pickBanOrder, currentModeConfig.teamPickLimit]);
 
-  const resetGame = () => {
-    setTeam1Bans([]); // Reset Team 1 bans
-    setTeam2Bans([]); // Reset Team 2 bans
+  const handleRandomCharacterSelection = useCallback(() => {
+    if (!currentTurn || availableCharacters.length === 0) {
+      toast.error("Нет доступных персонажей для случайного выбора.");
+      return;
+    }
+
+    // Access control for random selection
+    if (selectedRole === 'spectator') {
+      toast.error("Зрители не могут делать выбор.");
+      return;
+    }
+    if (selectedRole === 'captain' && currentTurn.team !== selectedTeam) {
+      toast.error("Сейчас ход другой команды.");
+      return;
+    }
+
+    const randomIndex = Math.floor(Math.random() * availableCharacters.length);
+    const randomCharacter = availableCharacters[randomIndex];
+    handleCharacterAction(randomCharacter, true);
+  }, [currentTurn, availableCharacters, selectedRole, selectedTeam, handleCharacterAction]);
+
+  const resetGame = useCallback(() => {
+    setTeam1Bans([]);
+    setTeam2Bans([]);
     setTeam1Picks([]);
     setTeam2Picks([]);
     setCurrentTurnIndex(0);
-    setIsTimerActive(false);
     if (timerIntervalRef.current) {
       clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
     }
     setTimer(0);
     setGameStarted(false);
     setShowTeamCompositionDialog(false);
-    // Сброс состояния регистрации для полного перезапуска
     setIsUserRegistered(false);
     setNickname('');
     setSelectedRole('');
     setSelectedTeam('');
-    setRegisteredUsers([]); // Очищаем список зарегистрированных пользователей
+    setRegisteredUsers([]);
     toast.info("Игра и регистрация сброшены.");
-  };
+  }, []);
 
   const handleStartGame = () => {
     setGameStarted(true);
@@ -258,7 +236,7 @@ const Index = () => {
     }
 
     const newUser: RegisteredUser = {
-      id: Date.now().toString(), // Простой уникальный ID
+      id: Date.now().toString(),
       nickname: nickname.trim(),
       role: selectedRole,
     };
@@ -283,10 +261,11 @@ const Index = () => {
   };
 
   useEffect(() => {
-    if (!gameStarted || gameEnded) {
-      setIsTimerActive(false);
+    // Clear any existing interval on cleanup or if game state changes to inactive
+    if (!gameStarted || gameEnded || !currentTurn) {
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
       }
       if (gameEnded && gameStarted) {
         setShowTeamCompositionDialog(true);
@@ -294,34 +273,39 @@ const Index = () => {
       return;
     }
 
-    if (currentTurn && !isTimerActive) {
-      resetTimer(currentTurnIndex);
-    }
-
-    if (isTimerActive && timer > 0) {
+    // If a turn is active and timer is not running, start it
+    if (!timerIntervalRef.current) {
+      setTimer(getTimerDuration(currentTurnIndex)); // Reset timer for new turn
       timerIntervalRef.current = setInterval(() => {
-        setTimer(prev => prev - 1);
+        setTimer(prev => {
+          if (prev <= 1) { // If timer is 1 or 0, it's about to expire
+            if (timerIntervalRef.current) {
+              clearInterval(timerIntervalRef.current);
+              timerIntervalRef.current = null;
+            }
+            toast.warning(`Время для ${currentTurn.team} истекло! Выбирается случайный персонаж.`);
+            handleRandomCharacterSelection();
+            return 0; // Set timer to 0
+          }
+          return prev - 1;
+        });
       }, 1000);
-    } else if (timer === 0 && isTimerActive) {
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
-      }
-      toast.warning(`Время для ${currentTurn?.team} истекло! Выбирается случайный персонаж.`);
-      handleRandomCharacterSelection();
     }
 
+    // Cleanup function: clear interval when component unmounts or dependencies change
     return () => {
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
       }
     };
-  }, [currentTurn, isTimerActive, timer, gameEnded, currentTurnIndex, gameStarted]);
+  }, [gameStarted, gameEnded, currentTurn, currentTurnIndex, handleRandomCharacterSelection]);
 
   useEffect(() => {
     if (isUserRegistered) {
       resetGame();
     }
-  }, [selectedModeKey]);
+  }, [selectedModeKey, isUserRegistered, resetGame]);
 
   // Determine if the current user can perform an action
   const canPerformAction = useMemo(() => {
