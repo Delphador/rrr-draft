@@ -301,11 +301,12 @@ const Index = () => {
     };
   }, [gameStarted, gameEnded, currentTurn, currentTurnIndex, handleRandomCharacterSelection]);
 
-  useEffect(() => {
-    if (isUserRegistered) {
-      resetGame();
-    }
-  }, [selectedModeKey, isUserRegistered, resetGame]);
+  // Removed the problematic useEffect that called resetGame on isUserRegistered change.
+  // useEffect(() => {
+  //   if (isUserRegistered) {
+  //     resetGame();
+  //   }
+  // }, [selectedModeKey, isUserRegistered, resetGame]);
 
   // Determine if the current user can perform an action
   const canPerformAction = useMemo(() => {
@@ -321,7 +322,7 @@ const Index = () => {
 
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4"> {/* Changed bg-gray-100 to bg-background */}
       <div className="absolute top-4 left-4">
         <ThemeToggle />
       </div>
@@ -332,7 +333,7 @@ const Index = () => {
         </p>
       </div>
 
-      <div className="w-full max-w-4xl bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-8">
+      <div className="w-full max-w-4xl bg-card rounded-lg shadow-lg p-6 mb-8"> {/* Changed bg-white to bg-card */}
         {!gameStarted ? ( // First, choose game mode
           <div className="flex flex-col items-center justify-center gap-6">
             <label htmlFor="game-mode-select" className="text-lg font-semibold text-gray-800 dark:text-gray-200">Выберите режим игры:</label>
@@ -417,7 +418,7 @@ const Index = () => {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                  <Card className="bg-gray-50 dark:bg-gray-700">
+                  <Card className="bg-secondary"> {/* Changed bg-gray-50 to bg-secondary */}
                     <CardHeader>
                       <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">Команда 1: Выбрано ({team1Picks.length}/{currentModeConfig.teamPickLimit})</CardTitle>
                     </CardHeader>
@@ -434,7 +435,7 @@ const Index = () => {
                     </CardContent>
                   </Card>
 
-                  <Card className="bg-gray-50 dark:bg-gray-700">
+                  <Card className="bg-secondary"> {/* Changed bg-gray-50 to bg-secondary */}
                     <CardHeader>
                       <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">Команда 2: Выбрано ({team2Picks.length}/{currentModeConfig.teamPickLimit})</CardTitle>
                     </CardHeader>
@@ -454,7 +455,7 @@ const Index = () => {
 
                 {/* New section for Banned Characters */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                  <Card className="bg-gray-50 dark:bg-gray-700">
+                  <Card className="bg-secondary"> {/* Changed bg-gray-50 to bg-secondary */}
                     <CardHeader>
                       <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">Команда 1: Забанено ({team1Bans.length}/{team1BanLimitDisplay})</CardTitle>
                     </CardHeader>
@@ -471,7 +472,7 @@ const Index = () => {
                     </CardContent>
                   </Card>
 
-                  <Card className="bg-gray-50 dark:bg-gray-700">
+                  <Card className="bg-secondary"> {/* Changed bg-gray-50 to bg-secondary */}
                     <CardHeader>
                       <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">Команда 2: Забанено ({team2Bans.length}/{team2BanLimitDisplay})</CardTitle>
                     </CardHeader>
@@ -497,7 +498,7 @@ const Index = () => {
                       className={`
                         cursor-pointer transition-shadow duration-200
                         ${canPerformAction ? 'hover:shadow-md' : 'opacity-50 cursor-not-allowed'}
-                        bg-white dark:bg-gray-700
+                        bg-card {/* Changed bg-white to bg-card */}
                       `}
                       onClick={() => canPerformAction && handleCharacterAction(char)}
                     >
