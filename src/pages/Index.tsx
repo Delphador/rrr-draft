@@ -17,6 +17,7 @@ import ChatPanel from "@/components/ChatPanel";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { XCircle, PlusCircle, Copy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { v4 as uuidv4 } from 'uuid'; // Импортируем v4 из uuid
 
 type TurnAction = 'ban' | 'pick';
 type Team = 'Team 1' | 'Team 2';
@@ -429,7 +430,7 @@ const Index = () => {
 
     let newUser: Omit<RegisteredUser, 'id'> & { room_id: string, user_id: string } = {
       room_id: roomId,
-      user_id: crypto.randomUUID(),
+      user_id: uuidv4(), // Используем uuidv4() вместо crypto.randomUUID()
       nickname: nickname.trim(),
       role: selectedRole,
     };
@@ -563,12 +564,31 @@ const Index = () => {
   };
 
   const copyToClipboard = (text: string, message: string) => {
-    navigator.clipboard.writeText(text).then(() => {
-      toast.success(message);
-    }).catch(err => {
-      console.error('Failed to copy: ', err);
-      toast.error("Не удалось скопировать.");
-    });
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        toast.success(message);
+      }).catch(err => {
+        console.error('Failed to copy: ', err);
+        toast.error("Не удалось скопировать.");
+      });
+    } else {
+      // Fallback for environments where navigator.clipboard is not available
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed'; // Avoid scrolling to bottom
+        textarea.style.opacity = '0'; // Hide it
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        toast.success(message);
+      } catch (err) {
+        console.error('Fallback copy failed: ', err);
+        toast.error("Не удалось скопировать. Ваш браузер не поддерживает автоматическое копирование.");
+      }
+    }
   };
 
   return (
