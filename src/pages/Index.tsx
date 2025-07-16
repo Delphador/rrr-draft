@@ -24,7 +24,7 @@ interface GameModeConfig {
   name: string;
   pickBanOrder: Turn[];
   teamPickLimit: number;
-  totalBanLimit: number;
+  totalBanLimit: number; // This will now represent the total bans across both teams
 }
 
 interface RegisteredUser {
@@ -89,7 +89,8 @@ const Index = () => {
   const [gameStarted, setGameStarted] = useState(false);
   const currentModeConfig = useMemo(() => gameModes[selectedModeKey], [selectedModeKey]);
 
-  const [bannedCharacters, setBannedCharacters] = useState<Character[]>([]);
+  const [team1Bans, setTeam1Bans] = useState<Character[]>([]); // New state for Team 1 bans
+  const [team2Bans, setTeam2Bans] = useState<Character[]>([]); // New state for Team 2 bans
   const [team1Picks, setTeam1Picks] = useState<Character[]>([]);
   const [team2Picks, setTeam2Picks] = useState<Character[]>([]);
   const [currentTurnIndex, setCurrentTurnIndex] = useState(0);
@@ -114,12 +115,13 @@ const Index = () => {
 
   const availableCharacters = useMemo(() => {
     const allSelectedIds = new Set([
-      ...bannedCharacters.map(c => c.id),
+      ...team1Bans.map(c => c.id), // Include Team 1 bans
+      ...team2Bans.map(c => c.id), // Include Team 2 bans
       ...team1Picks.map(c => c.id),
       ...team2Picks.map(c => c.id),
     ]);
     return CHARACTERS.filter(char => !allSelectedIds.has(char.id));
-  }, [bannedCharacters, team1Picks, team2Picks]);
+  }, [team1Bans, team2Bans, team1Picks, team2Picks]); // Update dependencies
 
   const gameEnded = currentTurnIndex >= currentModeConfig.pickBanOrder.length;
 
@@ -168,7 +170,8 @@ const Index = () => {
       return;
     }
 
-    const isAlreadySelected = bannedCharacters.some(c => c.id === character.id) ||
+    const isAlreadySelected = team1Bans.some(c => c.id === character.id) ||
+                              team2Bans.some(c => c.id === character.id) ||
                               team1Picks.some(c => c.id === character.id) ||
                               team2Picks.some(c => c.id === character.id);
 
@@ -177,13 +180,26 @@ const Index = () => {
       return;
     }
 
+    // Calculate team-specific ban limits based on pickBanOrder
+    const team1BanLimit = currentModeConfig.pickBanOrder.filter(turn => turn.type === 'ban' && turn.team === 'Team 1').length;
+    const team2BanLimit = currentModeConfig.pickBanOrder.filter(turn => turn.type === 'ban' && turn.team === 'Team 2').length;
+
     if (currentTurn.type === 'ban') {
-      if (bannedCharacters.length >= currentModeConfig.totalBanLimit) {
-        if (!isRandom) toast.error("Достигнут максимальный лимит банов.");
-        return;
+      if (currentTurn.team === 'Team 1') {
+        if (team1Bans.length >= team1BanLimit) {
+          if (!isRandom) toast.error(`Команда 1 уже забанила ${team1BanLimit} персонажей.`);
+          return;
+        }
+        setTeam1Bans(prev => [...prev, character]);
+        toast.success(`${currentTurn.team} ${isRandom ? 'автоматически забанил' : 'забанил'} ${character.name}.`);
+      } else { // Team 2
+        if (team2Bans.length >= team2BanLimit) {
+          if (!isRandom) toast.error(`Команда 2 уже забанила ${team2BanLimit} персонажей.`);
+          return;
+        }
+        setTeam2Bans(prev => [...prev, character]);
+        toast.success(`${currentTurn.team} ${isRandom ? 'автоматически забанил' : 'забанил'} ${character.name}.`);
       }
-      setBannedCharacters(prev => [...prev, character]);
-      toast.success(`${currentTurn.team} ${isRandom ? 'автоматически забанил' : 'забанил'} ${character.name}.`);
     } else { // type === 'pick'
       if (currentTurn.team === 'Team 1') {
         if (team1Picks.length >= currentModeConfig.teamPickLimit) {
@@ -206,7 +222,8 @@ const Index = () => {
   };
 
   const resetGame = () => {
-    setBannedCharacters([]);
+    setTeam1Bans([]); // Reset Team 1 bans
+    setTeam2Bans([]); // Reset Team 2 bans
     setTeam1Picks([]);
     setTeam2Picks([]);
     setCurrentTurnIndex(0);
@@ -301,19 +318,10 @@ const Index = () => {
   }, [currentTurn, isTimerActive, timer, gameEnded, currentTurnIndex, gameStarted]);
 
   useEffect(() => {
-    // This effect should only run when game mode changes AFTER registration,
-    // or when game is reset.
-    // If gameStarted is false, it means we are either at initial state or after reset.
-    // If isUserRegistered is true, it means user just registered and we need to reset game state for new mode.
-    if (isUserRegistered && gameStarted) {
-      // This condition ensures resetGame is not called on initial load or after a full reset
-      // but only when a user is registered and a new game mode is selected.
-      // However, the user wants to select mode first, then register.
-      // So, this useEffect might need to be re-evaluated or removed if it causes issues with the new flow.
-      // For now, I'll keep it as is, but it might be redundant or problematic with the new flow.
-      // Let's remove it for now, as resetGame is called explicitly on game start.
+    if (isUserRegistered) {
+      resetGame();
     }
-  }, [selectedModeKey]); // Removed isUserRegistered from dependency array
+  }, [selectedModeKey]);
 
   // Determine if the current user can perform an action
   const canPerformAction = useMemo(() => {
@@ -322,6 +330,11 @@ const Index = () => {
     if (selectedRole === 'captain' && currentTurn.team === selectedTeam) return true;
     return false;
   }, [gameStarted, gameEnded, currentTurn, selectedRole, selectedTeam]);
+
+  // Calculate team-specific ban limits for display
+  const team1BanLimitDisplay = useMemo(() => currentModeConfig.pickBanOrder.filter(turn => turn.type === 'ban' && turn.team === 'Team 1').length, [currentModeConfig]);
+  const team2BanLimitDisplay = useMemo(() => currentModeConfig.pickBanOrder.filter(turn => turn.type === 'ban' && turn.team === 'Team 2').length, [currentModeConfig]);
+
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
@@ -455,22 +468,42 @@ const Index = () => {
                   </Card>
                 </div>
 
-                <Card className="mb-8 bg-gray-50 dark:bg-gray-700">
-                  <CardHeader>
-                    <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">Забаненные персонажи ({bannedCharacters.length}/{currentModeConfig.totalBanLimit})</CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex flex-wrap gap-2">
-                    {bannedCharacters.length > 0 ? (
-                      bannedCharacters.map(char => (
-                        <Badge key={char.id} variant="destructive" className="bg-red-500 hover:bg-red-600 text-white">
-                          {char.name}
-                        </Badge>
-                      ))
-                    ) : (
-                      <p className="text-gray-500 dark:text-gray-400">Пока нет забаненных персонажей</p>
-                    )}
-                  </CardContent>
-                </Card>
+                {/* New section for Banned Characters */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                  <Card className="bg-gray-50 dark:bg-gray-700">
+                    <CardHeader>
+                      <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">Команда 1: Забанено ({team1Bans.length}/{team1BanLimitDisplay})</CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex flex-wrap gap-2">
+                      {team1Bans.length > 0 ? (
+                        team1Bans.map(char => (
+                          <Badge key={char.id} variant="destructive" className="bg-red-500 hover:bg-red-600 text-white">
+                            {char.name}
+                          </Badge>
+                        ))
+                      ) : (
+                        <p className="text-gray-500 dark:text-gray-400">Пока нет забаненных персонажей</p>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-gray-50 dark:bg-gray-700">
+                    <CardHeader>
+                      <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">Команда 2: Забанено ({team2Bans.length}/{team2BanLimitDisplay})</CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex flex-wrap gap-2">
+                      {team2Bans.length > 0 ? (
+                        team2Bans.map(char => (
+                          <Badge key={char.id} variant="destructive" className="bg-red-500 hover:bg-red-600 text-white">
+                            {char.name}
+                          </Badge>
+                        ))
+                      ) : (
+                        <p className="text-gray-500 dark:text-gray-400">Пока нет забаненных персонажей</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
 
                 <h3 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-200">Доступные персонажи</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
