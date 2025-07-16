@@ -130,7 +130,6 @@ const Index = () => {
 
   const gameEnded = currentTurnIndex >= currentModeConfig.pickBanOrder.length;
 
-  // Moved canPerformAction definition before handleManualCharacterSelection
   const canPerformAction = useMemo(() => {
     if (!gameStarted || gameEnded || !currentTurn) return false;
     if (selectedRole === 'spectator') return false;
@@ -221,15 +220,11 @@ const Index = () => {
       return;
     }
 
+    // Inform the user if they are not the active player, but don't prevent the automatic action
     if (selectedRole === 'spectator') {
-      toast.error("Зрители не могут делать выбор.");
-      setCurrentTurnIndex(prev => prev + 1);
-      return;
-    }
-    if (selectedRole === 'captain' && currentTurn.team !== selectedTeam) {
-      toast.error("Сейчас ход другой команды.");
-      setCurrentTurnIndex(prev => prev + 1);
-      return;
+      toast.warning("Зрители не могут делать выбор. Автоматический выбор будет произведен.");
+    } else if (selectedRole === 'captain' && currentTurn.team !== selectedTeam) {
+      toast.warning("Сейчас ход другой команды. Автоматический выбор будет произведен.");
     }
 
     if (availableCharacters.length === 0) {
@@ -237,9 +232,9 @@ const Index = () => {
     } else {
       const randomIndex = Math.floor(Math.random() * availableCharacters.length);
       const randomCharacter = availableCharacters[randomIndex];
-      handleCharacterAction(randomCharacter, true);
+      handleCharacterAction(randomCharacter, true); // Always attempt the automatic action
     }
-    setCurrentTurnIndex(prev => prev + 1);
+    setCurrentTurnIndex(prev => prev + 1); // Always move to the next turn after timer expiry
   }, [currentTurn, availableCharacters, selectedRole, selectedTeam, handleCharacterAction]);
 
 
