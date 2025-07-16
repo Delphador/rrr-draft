@@ -12,8 +12,10 @@ import TeamCompositionDialog from "@/components/TeamCompositionDialog";
 import RoomStatePanel from "@/components/RoomStatePanel";
 import GameLogPanel from "@/components/GameLogPanel";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { Progress } from "@/components/ui/progress"; // Import Progress component
-import ChatPanel from "@/components/ChatPanel"; // Import ChatPanel component
+import { Progress } from "@/components/ui/progress";
+import ChatPanel from "@/components/ChatPanel";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"; // Import Tooltip components
+import { XCircle, PlusCircle } from "lucide-react"; // Icons for placeholders
 
 type TurnAction = 'ban' | 'pick';
 type Team = 'Team 1' | 'Team 2';
@@ -27,7 +29,7 @@ interface GameModeConfig {
   name: string;
   pickBanOrder: Turn[];
   teamPickLimit: number;
-  totalBanLimit: number; // This will now represent the total bans across both teams
+  totalBanLimit: number;
 }
 
 interface RegisteredUser {
@@ -100,7 +102,7 @@ const Index = () => {
   const [timer, setTimer] = useState(0);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [showTeamCompositionDialog, setShowTeamCompositionDialog] = useState(false);
-  const [gameLog, setGameLog] = useState<string[]>([]); // New state for game log
+  const [gameLog, setGameLog] = useState<string[]>([]);
 
   const currentTurn = useMemo<Turn | null>(() => {
     if (currentTurnIndex < currentModeConfig.pickBanOrder.length) {
@@ -128,11 +130,10 @@ const Index = () => {
 
   const gameEnded = currentTurnIndex >= currentModeConfig.pickBanOrder.length;
 
-  // This function now only performs the action and returns success status
   const handleCharacterAction = useCallback((character: Character, isRandom: boolean = false): boolean => {
     if (!currentTurn) {
       if (!isRandom) toast.info("Игра завершена!");
-      return false; // Indicate failure
+      return false;
     }
 
     const isAlreadySelected = team1Bans.some(c => c.id === character.id) ||
@@ -142,7 +143,7 @@ const Index = () => {
 
     if (isAlreadySelected) {
       if (!isRandom) toast.error("Этот персонаж уже выбран или забанен.");
-      return false; // Indicate failure
+      return false;
     }
 
     const team1BanLimit = currentModeConfig.pickBanOrder.filter(turn => turn.type === 'ban' && turn.team === 'Team 1').length;
@@ -160,7 +161,7 @@ const Index = () => {
         setTeam1Bans(prev => [...prev, character]);
         logMessage = `${currentTurn.team} ${isRandom ? 'автоматически забанил' : 'забанил'} ${character.name}.`;
         actionSuccessful = true;
-      } else { // Team 2
+      } else {
         if (team2Bans.length >= team2BanLimit) {
           if (!isRandom) toast.error(`Команда 2 уже забанила ${team2BanLimit} персонажей.`);
           return false;
@@ -169,7 +170,7 @@ const Index = () => {
         logMessage = `${currentTurn.team} ${isRandom ? 'автоматически забанил' : 'забанил'} ${character.name}.`;
         actionSuccessful = true;
       }
-    } else { // type === 'pick'
+    } else {
       if (currentTurn.team === 'Team 1') {
         if (team1Picks.length >= currentModeConfig.teamPickLimit) {
           if (!isRandom) toast.error(`Команда 1 уже выбрала ${currentModeConfig.teamPickLimit} персонажей.`);
@@ -178,7 +179,7 @@ const Index = () => {
         setTeam1Picks(prev => [...prev, character]);
         logMessage = `${currentTurn.team} ${isRandom ? 'автоматически выбрал' : 'выбрал'} ${character.name}.`;
         actionSuccessful = true;
-      } else { // Team 2
+      } else {
         if (team2Picks.length >= currentModeConfig.teamPickLimit) {
           if (!isRandom) toast.error(`Команда 2 уже выбрала ${currentModeConfig.teamPickLimit} персонажей.`);
           return false;
@@ -190,32 +191,28 @@ const Index = () => {
     }
     if (actionSuccessful) {
       toast.success(logMessage);
-      setGameLog(prev => [...prev, logMessage]); // Add to game log
+      setGameLog(prev => [...prev, logMessage]);
     }
-    return actionSuccessful; // Indicate success/failure
+    return actionSuccessful;
   }, [currentTurn, team1Bans, team2Bans, team1Picks, team2Picks, currentModeConfig.pickBanOrder, currentModeConfig.teamPickLimit]);
 
-  // Function for manual character selection
   const handleManualCharacterSelection = useCallback((character: Character) => {
     if (canPerformAction) {
       if (handleCharacterAction(character, false)) {
-        setCurrentTurnIndex(prev => prev + 1); // Advance turn only if action was successful
+        setCurrentTurnIndex(prev => prev + 1);
       }
     } else {
       toast.error("Вы не можете совершить это действие сейчас.");
     }
   }, [canPerformAction, handleCharacterAction]);
 
-  // Function for timer expiry or random pick button
   const handleTimerExpiryOrRandomPick = useCallback(() => {
     if (!currentTurn) {
       toast.info("Игра завершена!");
-      setCurrentTurnIndex(prev => prev + 1); // Still advance to ensure game ends
+      setCurrentTurnIndex(prev => prev + 1);
       return;
     }
 
-    // Check if the current user is allowed to trigger this (for the button)
-    // For timer expiry, this check is implicitly handled by the timer only running for the active turn
     if (selectedRole === 'spectator') {
       toast.error("Зрители не могут делать выбор.");
       setCurrentTurnIndex(prev => prev + 1);
@@ -232,9 +229,8 @@ const Index = () => {
     } else {
       const randomIndex = Math.floor(Math.random() * availableCharacters.length);
       const randomCharacter = availableCharacters[randomIndex];
-      handleCharacterAction(randomCharacter, true); // This will perform the action
+      handleCharacterAction(randomCharacter, true);
     }
-    // Always advance the turn after a random selection attempt (successful or not)
     setCurrentTurnIndex(prev => prev + 1);
   }, [currentTurn, availableCharacters, selectedRole, selectedTeam, handleCharacterAction]);
 
@@ -257,7 +253,7 @@ const Index = () => {
     setSelectedRole('');
     setSelectedTeam('');
     setRegisteredUsers([]);
-    setGameLog([]); // Reset game log
+    setGameLog([]);
     toast.info("Игра и регистрация сброшены.");
   }, []);
 
@@ -293,7 +289,7 @@ const Index = () => {
       newUser.team = selectedTeam;
       setRegisteredUsers(prev => [...prev, newUser]);
       toast.success(`Вы зарегистрированы как капитан ${selectedTeam}: ${nickname}`);
-    } else { // spectator
+    } else {
       setRegisteredUsers(prev => [...prev, newUser]);
       toast.success(`Вы зарегистрированы как зритель: ${nickname}`);
     }
@@ -301,36 +297,31 @@ const Index = () => {
   };
 
   useEffect(() => {
-    // Clear any existing interval when dependencies change or component unmounts
     if (timerIntervalRef.current) {
       clearInterval(timerIntervalRef.current);
       timerIntervalRef.current = null;
     }
 
-    // Only start a new timer if the game is active and there's a current turn
     if (gameStarted && !gameEnded && currentTurn) {
-      setTimer(getTimerDuration(currentTurnIndex)); // Set initial timer for the new turn
+      setTimer(getTimerDuration(currentTurnIndex));
       timerIntervalRef.current = setInterval(() => {
         setTimer(prev => {
           if (prev <= 1) {
-            // Time's up, perform action and clear interval
             if (timerIntervalRef.current) {
               clearInterval(timerIntervalRef.current);
               timerIntervalRef.current = null;
             }
             toast.warning(`Время для ${currentTurn.team} истекло! Выбирается случайный персонаж.`);
-            handleTimerExpiryOrRandomPick(); // This call will now handle turn advancement
+            handleTimerExpiryOrRandomPick();
             return 0;
           }
           return prev - 1;
         });
       }, 1000);
     } else if (gameEnded && gameStarted) {
-      // If game ended, show dialog
       setShowTeamCompositionDialog(true);
     }
 
-    // Cleanup function: clear interval when component unmounts or dependencies change
     return () => {
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
@@ -339,7 +330,6 @@ const Index = () => {
     };
   }, [gameStarted, gameEnded, currentTurn, currentTurnIndex, handleTimerExpiryOrRandomPick]);
 
-  // Determine if the current user can perform an action
   const canPerformAction = useMemo(() => {
     if (!gameStarted || gameEnded || !currentTurn) return false;
     if (selectedRole === 'spectator') return false;
@@ -347,7 +337,6 @@ const Index = () => {
     return false;
   }, [gameStarted, gameEnded, currentTurn, selectedRole, selectedTeam]);
 
-  // Calculate team-specific ban limits for display
   const team1BanLimitDisplay = useMemo(() => currentModeConfig.pickBanOrder.filter(turn => turn.type === 'ban' && turn.team === 'Team 1').length, [currentModeConfig]);
   const team2BanLimitDisplay = useMemo(() => currentModeConfig.pickBanOrder.filter(turn => turn.type === 'ban' && turn.team === 'Team 2').length, [currentModeConfig]);
 
@@ -356,20 +345,30 @@ const Index = () => {
     return (timer / duration) * 100;
   }, [timer, currentTurnIndex]);
 
+  const renderEmptySlots = (count: number, type: 'pick' | 'ban') => {
+    const Icon = type === 'ban' ? XCircle : PlusCircle;
+    return Array.from({ length: count }).map((_, i) => (
+      <Badge key={`empty-${type}-${i}`} variant="secondary" className="bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 flex items-center justify-center gap-1 pr-2 h-8 w-24">
+        <Icon className="h-4 w-4" />
+        {type === 'pick' ? 'Выбор' : 'Бан'}
+      </Badge>
+    ));
+  };
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 to-gray-700 p-4">
       <div className="absolute top-4 left-4">
         <ThemeToggle />
       </div>
       <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold mb-2 text-gray-900 dark:text-gray-100">Капитан Тидус</h1>
-        <p className="text-xl text-gray-600 dark:text-gray-400">
+        <h1 className="text-4xl font-bold mb-2 text-gray-100">Капитан Тидус</h1>
+        <p className="text-xl text-gray-300">
           {gameStarted ? (isUserRegistered ? currentModeConfig.name : "Псевдорегистрация") : "Выберите режим игры"}
         </p>
       </div>
 
       <div className="w-full max-w-4xl bg-card rounded-lg shadow-lg p-6 mb-8">
-        {!gameStarted ? ( // First, choose game mode
+        {!gameStarted ? (
           <div className="flex flex-col items-center justify-center gap-6">
             <label htmlFor="game-mode-select" className="text-lg font-semibold text-gray-800 dark:text-gray-200">Выберите режим игры:</label>
             <Select value={selectedModeKey} onValueChange={(value) => setSelectedModeKey(value)}>
@@ -388,8 +387,8 @@ const Index = () => {
               Начать игру
             </Button>
           </div>
-        ) : ( // Game started, now check registration
-          !isUserRegistered ? ( // If not registered, show registration form
+        ) : (
+          !isUserRegistered ? (
             <div className="flex flex-col items-center justify-center gap-6">
               <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">Регистрация</h2>
               <div className="w-full max-w-xs">
@@ -431,7 +430,7 @@ const Index = () => {
                 </Button>
               </div>
             </div>
-          ) : ( // User is registered, show game UI or game ended message
+          ) : (
             gameEnded ? (
               <div className="text-center">
                 <h2 className="text-3xl font-semibold text-green-600 dark:text-green-400 mb-4">Игра завершена!</h2>
@@ -442,90 +441,84 @@ const Index = () => {
               <>
                 <div className="mb-6 text-center">
                   <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">
-                    Текущий ход: <span className="text-blue-600 dark:text-blue-400">{currentTurn?.team}</span> - <span className="text-purple-600 dark:text-purple-400">{currentTurn?.type === 'ban' ? 'Бан' : 'Выбор'}</span>
+                    Текущий ход: <span className={`font-bold ${currentTurn?.team === selectedTeam && selectedRole === 'captain' ? 'text-red-500 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'}`}>{currentTurn?.team}</span> - <span className="text-purple-600 dark:text-purple-400">{currentTurn?.type === 'ban' ? 'Бан' : 'Выбор'}</span>
                   </h2>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
                     Ход {currentTurnIndex + 1} из {currentModeConfig.pickBanOrder.length}
                   </p>
-                  <div className="text-5xl font-bold text-red-500 dark:text-red-400 mt-4">
-                    {timer}s
-                  </div>
-                  <Progress value={timerProgress} className="w-full mt-2 h-2" /> {/* Progress Bar */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className={`text-5xl font-bold text-red-500 dark:text-red-400 mt-4 ${timer <= 5 ? 'animate-pulse' : ''}`}>
+                        {timer}s
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Время до конца хода</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  <Progress value={timerProgress} className="w-full mt-2 h-2" />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                  <Card className="bg-secondary border-l-4 border-green-500"> {/* Team 1 visual separation */}
+                  <Card className="bg-secondary border-l-4 border-green-500">
                     <CardHeader>
                       <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">Команда 1: Выбрано ({team1Picks.length}/{currentModeConfig.teamPickLimit})</CardTitle>
                     </CardHeader>
-                    <CardContent className="flex flex-wrap gap-2">
-                      {team1Picks.length > 0 ? (
-                        team1Picks.map(char => (
-                          <Badge key={char.id} variant="default" className="bg-green-500 hover:bg-green-600 text-white flex items-center gap-1 pr-2">
-                            <img src={char.image} alt={char.name} className="w-6 h-6 object-cover rounded-full" />
-                            {char.name}
-                          </Badge>
-                        ))
-                      ) : (
-                        <p className="text-gray-500 dark:text-gray-400">Пока нет выборов</p>
-                      )}
+                    <CardContent className="flex flex-wrap gap-2 min-h-[40px]">
+                      {team1Picks.map(char => (
+                        <Badge key={char.id} variant="default" className="bg-green-500 hover:bg-green-600 text-white flex items-center gap-1 pr-2">
+                          <img src={char.image} alt={char.name} className="w-6 h-6 object-cover rounded-full" />
+                          {char.name}
+                        </Badge>
+                      ))}
+                      {renderEmptySlots(currentModeConfig.teamPickLimit - team1Picks.length, 'pick')}
                     </CardContent>
                   </Card>
 
-                  <Card className="bg-secondary border-l-4 border-blue-500"> {/* Team 2 visual separation */}
+                  <Card className="bg-secondary border-l-4 border-blue-500">
                     <CardHeader>
                       <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">Команда 2: Выбрано ({team2Picks.length}/{currentModeConfig.teamPickLimit})</CardTitle>
                     </CardHeader>
-                    <CardContent className="flex flex-wrap gap-2">
-                      {team2Picks.length > 0 ? (
-                        team2Picks.map(char => (
-                          <Badge key={char.id} variant="default" className="bg-blue-500 hover:bg-blue-600 text-white flex items-center gap-1 pr-2">
-                            <img src={char.image} alt={char.name} className="w-6 h-6 object-cover rounded-full" />
-                            {char.name}
-                          </Badge>
-                        ))
-                      ) : (
-                        <p className="text-gray-500 dark:text-gray-400">Пока нет выборов</p>
-                      )}
+                    <CardContent className="flex flex-wrap gap-2 min-h-[40px]">
+                      {team2Picks.map(char => (
+                        <Badge key={char.id} variant="default" className="bg-blue-500 hover:bg-blue-600 text-white flex items-center gap-1 pr-2">
+                          <img src={char.image} alt={char.name} className="w-6 h-6 object-cover rounded-full" />
+                          {char.name}
+                        </Badge>
+                      ))}
+                      {renderEmptySlots(currentModeConfig.teamPickLimit - team2Picks.length, 'pick')}
                     </CardContent>
                   </Card>
                 </div>
 
-                {/* New section for Banned Characters */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                  <Card className="bg-secondary border-l-4 border-green-500"> {/* Team 1 visual separation */}
+                  <Card className="bg-secondary border-l-4 border-green-500">
                     <CardHeader>
                       <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">Команда 1: Забанено ({team1Bans.length}/{team1BanLimitDisplay})</CardTitle>
                     </CardHeader>
-                    <CardContent className="flex flex-wrap gap-2">
-                      {team1Bans.length > 0 ? (
-                        team1Bans.map(char => (
-                          <Badge key={char.id} variant="destructive" className="bg-red-500 hover:bg-red-600 text-white flex items-center gap-1 pr-2">
-                            <img src={char.image} alt={char.name} className="w-6 h-6 object-cover rounded-full" />
-                            {char.name}
-                          </Badge>
-                        ))
-                      ) : (
-                        <p className="text-gray-500 dark:text-gray-400">Пока нет забаненных персонажей</p>
-                      )}
+                    <CardContent className="flex flex-wrap gap-2 min-h-[40px]">
+                      {team1Bans.map(char => (
+                        <Badge key={char.id} variant="destructive" className="bg-red-500 hover:bg-red-600 text-white flex items-center gap-1 pr-2">
+                          <img src={char.image} alt={char.name} className="w-6 h-6 object-cover rounded-full" />
+                          {char.name}
+                        </Badge>
+                      ))}
+                      {renderEmptySlots(team1BanLimitDisplay - team1Bans.length, 'ban')}
                     </CardContent>
                   </Card>
 
-                  <Card className="bg-secondary border-l-4 border-blue-500"> {/* Team 2 visual separation */}
+                  <Card className="bg-secondary border-l-4 border-blue-500">
                     <CardHeader>
                       <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">Команда 2: Забанено ({team2Bans.length}/{team2BanLimitDisplay})</CardTitle>
                     </CardHeader>
-                    <CardContent className="flex flex-wrap gap-2">
-                      {team2Bans.length > 0 ? (
-                        team2Bans.map(char => (
-                          <Badge key={char.id} variant="destructive" className="bg-red-500 hover:bg-red-600 text-white flex items-center gap-1 pr-2">
-                            <img src={char.image} alt={char.name} className="w-6 h-6 object-cover rounded-full" />
-                            {char.name}
-                          </Badge>
-                        ))
-                      ) : (
-                        <p className="text-gray-500 dark:text-gray-400">Пока нет забаненных персонажей</p>
-                      )}
+                    <CardContent className="flex flex-wrap gap-2 min-h-[40px]">
+                      {team2Bans.map(char => (
+                        <Badge key={char.id} variant="destructive" className="bg-red-500 hover:bg-red-600 text-white flex items-center gap-1 pr-2">
+                          <img src={char.image} alt={char.name} className="w-6 h-6 object-cover rounded-full" />
+                          {char.name}
+                        </Badge>
+                      ))}
+                      {renderEmptySlots(team2BanLimitDisplay - team2Bans.length, 'ban')}
                     </CardContent>
                   </Card>
                 </div>
@@ -533,20 +526,26 @@ const Index = () => {
                 <h3 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-200">Доступные персонажи</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
                   {availableCharacters.map(char => (
-                    <Card
-                      key={char.id}
-                      className={`
-                        cursor-pointer transition-all duration-200
-                        ${canPerformAction ? 'hover:shadow-lg hover:border-primary' : 'opacity-50 cursor-not-allowed'}
-                        bg-card border-2 border-transparent
-                      `}
-                      onClick={() => handleManualCharacterSelection(char)}
-                    >
-                      <CardContent className="flex flex-col items-center p-4">
-                        <img src={char.image} alt={char.name} className="w-16 h-16 object-cover rounded-full mb-2 border-2 border-gray-300 dark:border-gray-600" />
-                        <p className="text-md font-medium text-gray-900 dark:text-gray-100 text-center">{char.name}</p>
-                      </CardContent>
-                    </Card>
+                    <Tooltip key={char.id}>
+                      <TooltipTrigger asChild>
+                        <Card
+                          className={`
+                            cursor-pointer transition-all duration-200
+                            ${canPerformAction ? 'hover:shadow-lg hover:border-primary' : 'opacity-50 cursor-not-allowed'}
+                            bg-card border-2 border-transparent
+                          `}
+                          onClick={() => handleManualCharacterSelection(char)}
+                        >
+                          <CardContent className="flex flex-col items-center p-4">
+                            <img src={char.image} alt={char.name} className="w-16 h-16 object-cover rounded-full mb-2 border-2 border-gray-300 dark:border-gray-600" />
+                            <p className="text-md font-medium text-gray-900 dark:text-gray-100 text-center">{char.name}</p>
+                          </CardContent>
+                        </Card>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{char.name}</p>
+                      </TooltipContent>
+                    </Tooltip>
                   ))}
                 </div>
                 <div className="mt-6 flex justify-center gap-4">

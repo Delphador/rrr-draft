@@ -52,7 +52,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ currentUserNickname, currentUserR
   };
 
   return (
-    <div className="fixed bottom-4 right-4 w-80 bg-card rounded-lg shadow-lg p-4 z-50 flex flex-col max-h-[calc(100vh-32px)]">
+    <div className="fixed bottom-4 right-4 w-80 md:w-80 w-full bg-card rounded-lg shadow-lg p-4 z-50 flex flex-col max-h-[calc(50vh-32px)] md:max-h-[calc(100vh-32px)]">
       <CardHeader className="p-0 pb-2">
         <CardTitle className="text-xl font-bold text-center text-foreground">Чат</CardTitle>
       </CardHeader>
