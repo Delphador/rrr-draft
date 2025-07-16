@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import TeamCompositionDialog from "@/components/TeamCompositionDialog";
 import RoomStatePanel from "@/components/RoomStatePanel";
+import GameLogPanel from "@/components/GameLogPanel"; // Import the new component
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 type TurnAction = 'ban' | 'pick';
@@ -128,7 +129,7 @@ const Index = () => {
   const handleCharacterAction = useCallback((character: Character, isRandom: boolean = false) => {
     if (!currentTurn) {
       if (!isRandom) toast.info("Игра завершена!");
-      return;
+      return false; // Indicate failure to advance turn
     }
 
     const isAlreadySelected = team1Bans.some(c => c.id === character.id) ||
@@ -138,71 +139,78 @@ const Index = () => {
 
     if (isAlreadySelected) {
       if (!isRandom) toast.error("Этот персонаж уже выбран или забанен.");
-      return;
+      return false; // Indicate failure to advance turn
     }
 
     const team1BanLimit = currentModeConfig.pickBanOrder.filter(turn => turn.type === 'ban' && turn.team === 'Team 1').length;
     const team2BanLimit = currentModeConfig.pickBanOrder.filter(turn => turn.type === 'ban' && turn.team === 'Team 2').length;
 
     let logMessage = '';
+    let actionSuccessful = false;
 
     if (currentTurn.type === 'ban') {
       if (currentTurn.team === 'Team 1') {
         if (team1Bans.length >= team1BanLimit) {
           if (!isRandom) toast.error(`Команда 1 уже забанила ${team1BanLimit} персонажей.`);
-          return;
+          return false;
         }
         setTeam1Bans(prev => [...prev, character]);
         logMessage = `${currentTurn.team} ${isRandom ? 'автоматически забанил' : 'забанил'} ${character.name}.`;
+        actionSuccessful = true;
       } else { // Team 2
         if (team2Bans.length >= team2BanLimit) {
           if (!isRandom) toast.error(`Команда 2 уже забанила ${team2BanLimit} персонажей.`);
-          return;
+          return false;
         }
         setTeam2Bans(prev => [...prev, character]);
         logMessage = `${currentTurn.team} ${isRandom ? 'автоматически забанил' : 'забанил'} ${character.name}.`;
+        actionSuccessful = true;
       }
     } else { // type === 'pick'
       if (currentTurn.team === 'Team 1') {
         if (team1Picks.length >= currentModeConfig.teamPickLimit) {
           if (!isRandom) toast.error(`Команда 1 уже выбрала ${currentModeConfig.teamPickLimit} персонажей.`);
-          return;
+          return false;
         }
         setTeam1Picks(prev => [...prev, character]);
         logMessage = `${currentTurn.team} ${isRandom ? 'автоматически выбрал' : 'выбрал'} ${character.name}.`;
+        actionSuccessful = true;
       } else { // Team 2
         if (team2Picks.length >= currentModeConfig.teamPickLimit) {
           if (!isRandom) toast.error(`Команда 2 уже выбрала ${currentModeConfig.teamPickLimit} персонажей.`);
-          return;
+          return false;
         }
         setTeam2Picks(prev => [...prev, character]);
         logMessage = `${currentTurn.team} ${isRandom ? 'автоматически выбрал' : 'выбрал'} ${character.name}.`;
+        actionSuccessful = true;
       }
     }
-    toast.success(logMessage);
-    setGameLog(prev => [...prev, logMessage]); // Add to game log
-    setCurrentTurnIndex(prev => prev + 1);
+    if (actionSuccessful) {
+      toast.success(logMessage);
+      setGameLog(prev => [...prev, logMessage]); // Add to game log
+    }
+    return actionSuccessful; // Indicate success to advance turn
   }, [currentTurn, team1Bans, team2Bans, team1Picks, team2Picks, currentModeConfig.pickBanOrder, currentModeConfig.teamPickLimit]);
 
   const handleRandomCharacterSelection = useCallback(() => {
     if (!currentTurn || availableCharacters.length === 0) {
       toast.error("Нет доступных персонажей для случайного выбора.");
-      return;
+      return false; // Indicate failure
     }
 
     // Access control for random selection
     if (selectedRole === 'spectator') {
       toast.error("Зрители не могут делать выбор.");
-      return;
+      return false;
     }
     if (selectedRole === 'captain' && currentTurn.team !== selectedTeam) {
       toast.error("Сейчас ход другой команды.");
-      return;
-      }
+      return false;
+    }
 
     const randomIndex = Math.floor(Math.random() * availableCharacters.length);
     const randomCharacter = availableCharacters[randomIndex];
-    handleCharacterAction(randomCharacter, true);
+    return handleCharacterAction(randomCharacter, true); // Return success/failure from action
   }, [currentTurn, availableCharacters, selectedRole, selectedTeam, handleCharacterAction]);
 
   const resetGame = useCallback(() => {
@@ -285,7 +293,8 @@ const Index = () => {
               timerIntervalRef.current = null;
             }
             toast.warning(`Время для ${currentTurn.team} истекло! Выбирается случайный персонаж.`);
-            handleRandomCharacterSelection(); // This will advance currentTurnIndex
+            handleRandomCharacterSelection(); // Attempt random selection
+            setCurrentTurnIndex(prevIndex => prevIndex + 1); // ALWAYS advance the turn after timer expires
             return 0;
           }
           return prev - 1;
@@ -304,15 +313,6 @@ const Index = () => {
       }
     };
   }, [gameStarted, gameEnded, currentTurn, currentTurnIndex, handleRandomCharacterSelection]);
-
-  // Removed the problematic useEffect that called resetGame on isUserRegistered change.
-  // The previous version had this commented out, now it's fully removed.
-  // useEffect(() => {
-  //   if (isUserRegistered) {
-  //     resetGame();
-  //   }
-  // }, [selectedModeKey, isUserRegistered, resetGame]);
-
 
   // Determine if the current user can perform an action
   const canPerformAction = useMemo(() => {
@@ -517,7 +517,7 @@ const Index = () => {
                 </div>
                 <div className="mt-6 flex justify-center gap-4">
                   <Button
-                    onClick={handleRandomCharacterSelection}
+                    onClick={() => handleRandomCharacterSelection()} // Call directly
                     disabled={!canPerformAction || availableCharacters.length === 0}
                     className="bg-yellow-600 hover:bg-yellow-700 text-white"
                   >
@@ -527,26 +527,6 @@ const Index = () => {
                     Сбросить игру
                   </Button>
                 </div>
-
-                {/* New Game Log Section */}
-                {gameStarted && isUserRegistered && (
-                    <Card className="bg-secondary mt-8 w-full max-w-4xl">
-                        <CardHeader>
-                            <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">История драфта</CardTitle>
-                        </CardHeader>
-                        <CardContent className="max-h-60 overflow-y-auto p-4 border rounded-md border-border">
-                            {gameLog.length > 0 ? (
-                                <ul className="list-disc list-inside space-y-1 text-gray-700 dark:text-gray-300">
-                                    {gameLog.map((entry, index) => (
-                                        <li key={index} className="text-sm">{entry}</li>
-                                    ))}
-                                </ul>
-                            ) : (
-                                <p className="text-gray-500 dark:text-gray-400 text-sm">История драфта будет отображаться здесь.</p>
-                            )}
-                        </CardContent>
-                    </Card>
-                )}
               </>
             )
           )
@@ -564,6 +544,10 @@ const Index = () => {
       <RoomStatePanel
         registeredUsers={registeredUsers}
       />
+
+      {gameStarted && isUserRegistered && (
+        <GameLogPanel gameLog={gameLog} />
+      )}
     </div>
   );
 };
