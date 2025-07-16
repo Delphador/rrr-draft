@@ -12,14 +12,21 @@ interface RegisteredUser {
 
 interface RoomStatePanelProps {
   registeredUsers: RegisteredUser[];
+  roomId: string | null; // Добавляем roomId для контекста
 }
 
 const RoomStatePanel: React.FC<RoomStatePanelProps> = ({
   registeredUsers,
+  roomId,
 }) => {
   return (
     <div className="fixed right-4 top-4 w-full md:w-80 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 z-50 md:max-h-[calc(100vh-150px)] max-h-[calc(50vh-32px)] overflow-y-auto">
       <h2 className="text-xl font-bold mb-2 text-center text-gray-900 dark:text-gray-100">Состояние комнаты</h2>
+      {roomId && (
+        <p className="text-center text-sm text-gray-600 dark:text-gray-400 mb-2">
+          ID комнаты: <span className="font-semibold">{roomId}</span>
+        </p>
+      )}
       <p className="text-center text-sm text-gray-600 dark:text-gray-400 mb-4">
         Список зарегистрированных участников:
       </p>
