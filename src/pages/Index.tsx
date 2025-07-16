@@ -130,6 +130,14 @@ const Index = () => {
 
   const gameEnded = currentTurnIndex >= currentModeConfig.pickBanOrder.length;
 
+  // Moved canPerformAction definition before handleManualCharacterSelection
+  const canPerformAction = useMemo(() => {
+    if (!gameStarted || gameEnded || !currentTurn) return false;
+    if (selectedRole === 'spectator') return false;
+    if (selectedRole === 'captain' && currentTurn.team === selectedTeam) return true;
+    return false;
+  }, [gameStarted, gameEnded, currentTurn, selectedRole, selectedTeam]);
+
   const handleCharacterAction = useCallback((character: Character, isRandom: boolean = false): boolean => {
     if (!currentTurn) {
       if (!isRandom) toast.info("Игра завершена!");
@@ -329,13 +337,6 @@ const Index = () => {
       }
     };
   }, [gameStarted, gameEnded, currentTurn, currentTurnIndex, handleTimerExpiryOrRandomPick]);
-
-  const canPerformAction = useMemo(() => {
-    if (!gameStarted || gameEnded || !currentTurn) return false;
-    if (selectedRole === 'spectator') return false;
-    if (selectedRole === 'captain' && currentTurn.team === selectedTeam) return true;
-    return false;
-  }, [gameStarted, gameEnded, currentTurn, selectedRole, selectedTeam]);
 
   const team1BanLimitDisplay = useMemo(() => currentModeConfig.pickBanOrder.filter(turn => turn.type === 'ban' && turn.team === 'Team 1').length, [currentModeConfig]);
   const team2BanLimitDisplay = useMemo(() => currentModeConfig.pickBanOrder.filter(turn => turn.type === 'ban' && turn.team === 'Team 2').length, [currentModeConfig]);
