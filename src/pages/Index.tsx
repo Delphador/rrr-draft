@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type TurnAction = 'ban' | 'pick';
 type Team = 'Team 1' | 'Team 2';
@@ -14,22 +15,56 @@ interface Turn {
   team: Team;
 }
 
-const pickBanOrder: Turn[] = [
-  { type: 'ban', team: 'Team 1' },
-  { type: 'ban', team: 'Team 2' },
-  { type: 'ban', team: 'Team 1' },
-  { type: 'ban', team: 'Team 2' },
-  { type: 'pick', team: 'Team 1' },
-  { type: 'pick', team: 'Team 2' },
-  { type: 'pick', team: 'Team 2' },
-  { type: 'pick', team: 'Team 1' },
-  { type: 'ban', team: 'Team 1' },
-  { type: 'ban', team: 'Team 2' },
-  { type: 'pick', team: 'Team 1' },
-  { type: 'pick', team: 'Team 2' },
-];
+interface GameModeConfig {
+  name: string;
+  pickBanOrder: Turn[];
+  teamPickLimit: number;
+  totalBanLimit: number;
+}
+
+const gameModes: Record<string, GameModeConfig> = {
+  '3v3': {
+    name: '3x3 PvP (Капитанский режим)',
+    pickBanOrder: [
+      { type: 'ban', team: 'Team 1' },
+      { type: 'ban', team: 'Team 2' },
+      { type: 'ban', team: 'Team 1' },
+      { type: 'ban', team: 'Team 2' },
+      { type: 'pick', team: 'Team 1' },
+      { type: 'pick', team: 'Team 2' },
+      { type: 'pick', team: 'Team 2' },
+      { type: 'pick', team: 'Team 1' },
+      { type: 'ban', team: 'Team 1' },
+      { type: 'ban', team: 'Team 2' },
+      { type: 'pick', team: 'Team 1' },
+      { type: 'pick', team: 'Team 2' },
+    ],
+    teamPickLimit: 3,
+    totalBanLimit: 6,
+  },
+  '2v2': {
+    name: '2x2 PvP',
+    pickBanOrder: [
+      { type: 'ban', team: 'Team 1' },
+      { type: 'ban', team: 'Team 2' },
+      { type: 'ban', team: 'Team 1' },
+      { type: 'ban', team: 'Team 2' },
+      { type: 'pick', team: 'Team 1' },
+      { type: 'pick', team: 'Team 2' },
+      { type: 'ban', team: 'Team 1' },
+      { type: 'ban', team: 'Team 2' },
+      { type: 'pick', team: 'Team 2' },
+      { type: 'pick', team: 'Team 1' },
+    ],
+    teamPickLimit: 2,
+    totalBanLimit: 6,
+  },
+};
 
 const Index = () => {
+  const [selectedModeKey, setSelectedModeKey] = useState<string>('3v3');
+  const currentModeConfig = useMemo(() => gameModes[selectedModeKey], [selectedModeKey]);
+
   const [bannedCharacters, setBannedCharacters] = useState<Character[]>([]);
   const [team1Picks, setTeam1Picks] = useState<Character[]>([]);
   const [team2Picks, setTeam2Picks] = useState<Character[]>([]);
@@ -39,11 +74,11 @@ const Index = () => {
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const currentTurn = useMemo<Turn | null>(() => {
-    if (currentTurnIndex < pickBanOrder.length) {
-      return pickBanOrder[currentTurnIndex];
+    if (currentTurnIndex < currentModeConfig.pickBanOrder.length) {
+      return currentModeConfig.pickBanOrder[currentTurnIndex];
     }
     return null;
-  }, [currentTurnIndex]);
+  }, [currentTurnIndex, currentModeConfig.pickBanOrder]);
 
   const getTimerDuration = (turnIndex: number) => {
     if (turnIndex === 0 || turnIndex === 1) { // Первые два бана
@@ -61,7 +96,7 @@ const Index = () => {
     return CHARACTERS.filter(char => !allSelectedIds.has(char.id));
   }, [bannedCharacters, team1Picks, team2Picks]);
 
-  const gameEnded = currentTurnIndex >= pickBanOrder.length;
+  const gameEnded = currentTurnIndex >= currentModeConfig.pickBanOrder.length;
 
   const resetTimer = (turnIndex: number) => {
     if (timerIntervalRef.current) {
@@ -98,19 +133,23 @@ const Index = () => {
     }
 
     if (currentTurn.type === 'ban') {
+      if (bannedCharacters.length >= currentModeConfig.totalBanLimit) {
+        if (!isRandom) toast.error("Достигнут максимальный лимит банов.");
+        return;
+      }
       setBannedCharacters(prev => [...prev, character]);
       toast.success(`${currentTurn.team} ${isRandom ? 'автоматически забанил' : 'забанил'} ${character.name}.`);
     } else { // type === 'pick'
       if (currentTurn.team === 'Team 1') {
-        if (team1Picks.length >= 3) {
-          if (!isRandom) toast.error("Команда 1 уже выбрала 3 персонажей.");
+        if (team1Picks.length >= currentModeConfig.teamPickLimit) {
+          if (!isRandom) toast.error(`Команда 1 уже выбрала ${currentModeConfig.teamPickLimit} персонажей.`);
           return;
         }
         setTeam1Picks(prev => [...prev, character]);
         toast.success(`${currentTurn.team} ${isRandom ? 'автоматически выбрал' : 'выбрал'} ${character.name}.`);
       } else { // Team 2
-        if (team2Picks.length >= 3) {
-          if (!isRandom) toast.error("Команда 2 уже выбрала 3 персонажей.");
+        if (team2Picks.length >= currentModeConfig.teamPickLimit) {
+          if (!isRandom) toast.error(`Команда 2 уже выбрала ${currentModeConfig.teamPickLimit} персонажей.`);
           return;
         }
         setTeam2Picks(prev => [...prev, character]);
@@ -167,6 +206,11 @@ const Index = () => {
     };
   }, [currentTurn, isTimerActive, timer, gameEnded, currentTurnIndex]);
 
+  // Reset game when mode changes
+  useEffect(() => {
+    resetGame();
+  }, [selectedModeKey]);
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
       <div className="text-center mb-8">
@@ -177,6 +221,22 @@ const Index = () => {
       </div>
 
       <div className="w-full max-w-4xl bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-8">
+        <div className="mb-6 flex justify-center items-center gap-4">
+          <label htmlFor="game-mode-select" className="text-lg font-semibold text-gray-800 dark:text-gray-200">Режим игры:</label>
+          <Select value={selectedModeKey} onValueChange={(value) => setSelectedModeKey(value)}>
+            <SelectTrigger id="game-mode-select" className="w-[200px]">
+              <SelectValue placeholder="Выберите режим" />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(gameModes).map(([key, mode]) => (
+                <SelectItem key={key} value={key}>
+                  {mode.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         {gameEnded ? (
           <div className="text-center">
             <h2 className="text-3xl font-semibold text-green-600 dark:text-green-400 mb-4">Игра завершена!</h2>
@@ -190,7 +250,7 @@ const Index = () => {
                 Текущий ход: <span className="text-blue-600 dark:text-blue-400">{currentTurn?.team}</span> - <span className="text-purple-600 dark:text-purple-400">{currentTurn?.type === 'ban' ? 'Бан' : 'Выбор'}</span>
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                Ход {currentTurnIndex + 1} из {pickBanOrder.length}
+                Ход {currentTurnIndex + 1} из {currentModeConfig.pickBanOrder.length}
               </p>
               <div className="text-5xl font-bold text-red-500 dark:text-red-400 mt-4">
                 {timer}s
@@ -200,7 +260,7 @@ const Index = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
               <Card className="bg-gray-50 dark:bg-gray-700">
                 <CardHeader>
-                  <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">Команда 1: Выбрано ({team1Picks.length}/3)</CardTitle>
+                  <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">Команда 1: Выбрано ({team1Picks.length}/{currentModeConfig.teamPickLimit})</CardTitle>
                 </CardHeader>
                 <CardContent className="flex flex-wrap gap-2">
                   {team1Picks.length > 0 ? (
@@ -217,7 +277,7 @@ const Index = () => {
 
               <Card className="bg-gray-50 dark:bg-gray-700">
                 <CardHeader>
-                  <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">Команда 2: Выбрано ({team2Picks.length}/3)</CardTitle>
+                  <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">Команда 2: Выбрано ({team2Picks.length}/{currentModeConfig.teamPickLimit})</CardTitle>
                 </CardHeader>
                 <CardContent className="flex flex-wrap gap-2">
                   {team2Picks.length > 0 ? (
@@ -235,7 +295,7 @@ const Index = () => {
 
             <Card className="mb-8 bg-gray-50 dark:bg-gray-700">
               <CardHeader>
-                <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">Забаненные персонажи ({bannedCharacters.length}/6)</CardTitle>
+                <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">Забаненные персонажи ({bannedCharacters.length}/{currentModeConfig.totalBanLimit})</CardTitle>
               </CardHeader>
               <CardContent className="flex flex-wrap gap-2">
                 {bannedCharacters.length > 0 ? (
