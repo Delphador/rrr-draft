@@ -407,18 +407,23 @@ const Index = () => {
       const { data: existingRoom, error: checkError } = await supabase
         .from('rooms')
         .select('id')
-        .eq('short_code', newShortCode)
-        .single();
+        .eq('short_code', newShortCode); // Removed .single()
 
-      if (checkError && checkError.code === 'PGRST116') {
+      if (checkError) {
+        // If error is PGRST116 (no rows found), it's unique
+        if (checkError.code === 'PGRST116') {
+          isUnique = true;
+          break;
+        } else {
+          console.error("Error checking short code uniqueness:", checkError);
+          toast.error("Ошибка при проверке уникальности короткого кода.");
+          return;
+        }
+      } else if (existingRoom && existingRoom.length === 0) { // Check if data is empty
         isUnique = true;
         break;
-      } else if (existingRoom) {
+      } else if (existingRoom && existingRoom.length > 0) { // Room found, generate new code
         newShortCode = generateShortCode();
-      } else if (checkError) {
-        console.error("Error checking short code uniqueness:", checkError);
-        toast.error("Ошибка при проверке уникальности короткого кода.");
-        return;
       }
     }
 
@@ -478,21 +483,27 @@ const Index = () => {
       const { data, error: uuidError } = await supabase
         .from('rooms')
         .select('id, name, short_code')
-        .eq('id', roomInput.trim()) // Use roomInput here
-        .single();
-      roomData = data;
-      error = uuidError;
+        .eq('id', roomInput.trim()); // Removed .single()
+      
+      if (uuidError && uuidError.code !== 'PGRST116') { // Handle actual errors, not just no rows
+        error = uuidError;
+      } else if (data && data.length > 0) {
+        roomData = data[0];
+      }
     }
 
     // If not found by UUID or it's not a UUID, try by short_code
-    if (!roomData && (!error || error.code === 'PGRST116')) {
+    if (!roomData && (!error || error.code === 'PGRST116')) { // Only try short code if UUID failed or was not a UUID
       const { data, error: shortCodeError } = await supabase
         .from('rooms')
         .select('id, name, short_code')
-        .eq('short_code', roomInput.trim()) // Use roomInput here
-        .single();
-      roomData = data;
-      error = shortCodeError;
+        .eq('short_code', roomInput.trim()); // Removed .single()
+      
+      if (shortCodeError && shortCodeError.code !== 'PGRST116') {
+        error = shortCodeError;
+      } else if (data && data.length > 0) {
+        roomData = data[0];
+      }
     }
 
     if (error || !roomData) {
@@ -542,7 +553,7 @@ const Index = () => {
       .eq('room_id', roomData.id); // Use roomData.id (UUID)
 
     if (fetchRoomUsersError) {
-      console.error("Error fetching initial room users on join:", fetchRoomUsersError);
+      console.error("Error fetching initial room users:", fetchRoomUsersError);
       toast.error("Ошибка при получении списка пользователей комнаты.");
     } else if (initialRoomUsers) {
       setRegisteredUsers(initialRoomUsers as RegisteredUser[]);
