@@ -358,55 +358,24 @@ const Index = () => {
       return;
     }
 
-    // Ensure an initial game state exists or create one
-    const { data: existingGameState, error: fetchGameStateError } = await supabase
+    // Update existing game state to start the game
+    const { error: updateError } = await supabase
       .from('game_states')
-      .select('*')
-      .eq('room_id', roomId)
-      .single();
-
-    if (fetchGameStateError && fetchGameStateError.code !== 'PGRST116') { // PGRST116 means "no rows found"
-      console.error("Error fetching existing game state:", fetchGameStateError);
-      toast.error("Ошибка при получении состояния игры.");
+      .update({
+        game_started: true,
+        current_turn_index: 0,
+        timer_start_time: new Date().toISOString(),
+        team1_bans: [],
+        team2_bans: [],
+        team1_picks: [],
+        team2_picks: [],
+        game_log: [`Игра началась в режиме ${currentModeConfig.name}.`]
+      })
+      .eq('room_id', roomId);
+    if (updateError) {
+      console.error("Error updating game state to start:", updateError);
+      toast.error("Ошибка при запуске игры.");
       return;
-    }
-
-    if (!existingGameState) {
-      // Create initial game state if it doesn't exist
-      const { error: insertError } = await supabase
-        .from('game_states')
-        .insert({
-          id: roomId, // id of game_states is the same as room_id
-          room_id: roomId,
-          game_started: true,
-          timer_start_time: new Date().toISOString(),
-          game_log: [`Игра началась в режиме ${currentModeConfig.name}.`]
-        });
-      if (insertError) {
-        console.error("Error inserting initial game state:", insertError);
-        toast.error("Ошибка при инициализации состояния игры.");
-        return;
-      }
-    } else {
-      // Update existing game state to start the game
-      const { error: updateError } = await supabase
-        .from('game_states')
-        .update({
-          game_started: true,
-          current_turn_index: 0,
-          timer_start_time: new Date().toISOString(),
-          team1_bans: [],
-          team2_bans: [],
-          team1_picks: [],
-          team2_picks: [],
-          game_log: [`Игра началась в режиме ${currentModeConfig.name}.`]
-        })
-        .eq('room_id', roomId);
-      if (updateError) {
-        console.error("Error updating game state to start:", updateError);
-        toast.error("Ошибка при запуске игры.");
-        return;
-      }
     }
     toast.success("Игра началась!");
   };
@@ -462,7 +431,7 @@ const Index = () => {
       toast.success(`Комната "${data[0].name}" создана! Код: ${data[0].short_code}`);
 
       // Insert initial game state for the new room
-      const { error: gameStateInsertError } = await supabase
+      const { data: newGameStateData, error: gameStateInsertError } = await supabase
         .from('game_states')
         .insert({
           id: createdRoomId, // id of game_states is the same as room_id
@@ -470,10 +439,15 @@ const Index = () => {
           game_started: false, // Game not started yet
           timer_start_time: new Date().toISOString(),
           game_log: [`Комната "${data[0].name}" создана. Ожидание начала игры.`]
-        });
+        })
+        .select() // Select the inserted row to get its data
+        .single(); // Expect a single row
+
       if (gameStateInsertError) {
         console.error("Error inserting initial game state for new room:", gameStateInsertError);
         toast.error("Ошибка при инициализации состояния игры для новой комнаты.");
+      } else if (newGameStateData) {
+        setGameState(newGameStateData as GameState); // Set initial game state
       }
     }
   };
@@ -520,6 +494,51 @@ const Index = () => {
     setRoomShortCode(roomData.short_code);
     setIsRoomJoined(true);
     toast.success(`Вы присоединились к комнате "${roomData.name}".`);
+
+    // Fetch initial game state for the joined room
+    const { data: initialGameState, error: fetchGameStateError } = await supabase
+      .from('game_states')
+      .select('*')
+      .eq('room_id', roomData.id)
+      .single();
+
+    if (fetchGameStateError && fetchGameStateError.code !== 'PGRST116') {
+      console.error("Error fetching initial game state on join:", fetchGameStateError);
+      toast.error("Ошибка при получении состояния игры.");
+    } else if (initialGameState) {
+      setGameState(initialGameState as GameState);
+    } else {
+      // If no game state exists, create a default one (should ideally be created with room)
+      const { data: newGameStateData, error: insertError } = await supabase
+        .from('game_states')
+        .insert({
+          id: roomData.id,
+          room_id: roomData.id,
+          game_started: false,
+          timer_start_time: new Date().toISOString(),
+          game_log: [`Комната "${roomData.name}" создана. Ожидание начала игры.`]
+        })
+        .select()
+        .single();
+      if (insertError) {
+        console.error("Error inserting initial game state for joined room:", insertError);
+      } else if (newGameStateData) {
+        setGameState(newGameStateData as GameState);
+      }
+    }
+
+    // Fetch initial room users for the joined room
+    const { data: initialRoomUsers, error: fetchRoomUsersError } = await supabase
+      .from('room_users')
+      .select('*')
+      .eq('room_id', roomData.id);
+
+    if (fetchRoomUsersError) {
+      console.error("Error fetching initial room users on join:", fetchRoomUsersError);
+      toast.error("Ошибка при получении списка пользователей комнаты.");
+    } else if (initialRoomUsers) {
+      setRegisteredUsers(initialRoomUsers as RegisteredUser[]);
+    }
   };
 
   const handleRegister = async () => {
@@ -597,14 +616,14 @@ const Index = () => {
     const channel = supabase
       .channel(`room_users_room_${roomId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'room_users', filter: `room_id=eq.${roomId}` }, payload => {
-        console.log('Change received!', payload);
+        console.log('Room users change received!', payload);
         supabase
           .from('room_users')
           .select('*')
           .eq('room_id', roomId)
           .then(({ data, error }) => {
             if (error) {
-              console.error("Error fetching room users:", error);
+              console.error("Error fetching room users on change:", error);
               return;
             }
             if (data) {
@@ -613,21 +632,6 @@ const Index = () => {
           });
       })
       .subscribe();
-
-    // Initial fetch
-    supabase
-      .from('room_users')
-      .select('*')
-      .eq('room_id', roomId)
-      .then(({ data, error }) => {
-        if (error) {
-          console.error("Error fetching initial room users:", error);
-          return;
-        }
-        if (data) {
-          setRegisteredUsers(data as RegisteredUser[]);
-        }
-      });
 
     return () => {
       supabase.removeChannel(channel);
@@ -659,39 +663,6 @@ const Index = () => {
           });
       })
       .subscribe();
-
-    // Initial fetch of game state when room is joined
-    supabase
-      .from('game_states')
-      .select('*')
-      .eq('room_id', roomId)
-      .single()
-      .then(({ data, error }) => {
-        if (error && error.code !== 'PGRST116') { // PGRST116 means "no rows found"
-          console.error("Error fetching initial game state:", error);
-          return;
-        }
-        if (data) {
-          setGameState(data as GameState);
-        } else {
-          // If no game state exists, initialize a default one (e.g., if room was created before game_states table)
-          // This case should ideally be handled by handleCreateRoom, but good for robustness.
-          setGameState({
-            id: roomId,
-            room_id: roomId,
-            team1_bans: [],
-            team2_bans: [],
-            team1_picks: [],
-            team2_picks: [],
-            current_turn_index: 0,
-            timer_start_time: new Date().toISOString(),
-            game_started: false,
-            game_log: [],
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          });
-        }
-      });
 
     return () => {
       supabase.removeChannel(channel);
