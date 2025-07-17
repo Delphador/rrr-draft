@@ -359,6 +359,15 @@ const Index = () => {
       toast.error("Сначала создайте или присоединитесь к комнате.");
       return;
     }
+    // Добавлена проверка: только капитан может начать игру
+    if (selectedRole !== 'captain') {
+      toast.error("Только капитан может начать игру.");
+      return;
+    }
+    if (!selectedTeam) {
+      toast.error("Капитан должен выбрать команду, чтобы начать игру.");
+      return;
+    }
 
     // Update existing game state to start the game
     const { error: updateError } = await supabase
@@ -694,10 +703,8 @@ const Index = () => {
         console.error("Error fetching initial game state:", fetchGameStateError);
         toast.error("Ошибка при получении состояния игры.");
       } else if (initialGameState && initialGameState.length > 0) {
-        console.log("Initial fetch: Setting game state to:", initialGameState[0]);
         setGameState(initialGameState[0] as GameState);
       } else {
-        console.log("Initial fetch: No game state found, attempting to insert.");
         // If no game state exists, create a default one (should ideally be created with room)
         const { error: insertError } = await supabase
           .from('game_states')
