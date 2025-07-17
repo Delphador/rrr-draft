@@ -645,20 +645,32 @@ const Index = () => {
       .channel(`game_states_room_${roomId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'game_states', filter: `room_id=eq.${roomId}` }, payload => {
         console.log('Game state change received!', payload);
-        // Re-fetch the game state to ensure we have the latest
-        supabase
-          .from('game_states')
-          .select('*')
-          .eq('room_id', roomId)
-          .then(({ data, error }) => {
-            if (error) {
-              console.error("Error fetching game state on change:", error);
-              return;
-            }
-            if (data && data.length > 0) {
-              setGameState(data[0] as GameState);
-            }
-          });
+        if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
+          const newGameState = payload.new as GameState;
+          console.log("Realtime: Setting game state directly from payload:", newGameState);
+          setGameState(newGameState);
+        } else if (payload.eventType === 'DELETE') {
+          console.log("Realtime: Game state deleted. Resetting.");
+          setGameState(null); 
+        } else {
+          // Fallback to re-fetch if eventType is not handled directly (e.g., initial LOAD)
+          supabase
+            .from('game_states')
+            .select('*')
+            .eq('room_id', roomId)
+            .then(({ data, error }) => {
+              if (error) {
+                console.error("Error fetching game state on change:", error);
+                return;
+              }
+              if (data && data.length > 0) {
+                console.log("Realtime (fallback): Setting game state to:", data[0]);
+                setGameState(data[0] as GameState);
+              } else {
+                console.log("Realtime (fallback): No game state data received for room:", roomId);
+              }
+            });
+        }
       })
       .subscribe();
 
@@ -682,8 +694,10 @@ const Index = () => {
         console.error("Error fetching initial game state:", fetchGameStateError);
         toast.error("Ошибка при получении состояния игры.");
       } else if (initialGameState && initialGameState.length > 0) {
+        console.log("Initial fetch: Setting game state to:", initialGameState[0]);
         setGameState(initialGameState[0] as GameState);
       } else {
+        console.log("Initial fetch: No game state found, attempting to insert.");
         // If no game state exists, create a default one (should ideally be created with room)
         const { error: insertError } = await supabase
           .from('game_states')
@@ -696,8 +710,9 @@ const Index = () => {
           });
         if (insertError) {
           console.error("Error inserting initial game state:", insertError);
+        } else {
+          console.log("Initial game state inserted. Waiting for Realtime update.");
         }
-        // No setGameState here, rely on subscription
       }
 
       // Fetch initial room users
