@@ -799,6 +799,7 @@ const Index = () => {
 
       <div className="w-full max-w-4xl bg-card rounded-lg shadow-lg p-6 mb-8">
         {!isRoomJoined ? (
+          // 1. Create or Join Room section
           <div className="flex flex-col items-center justify-center gap-6">
             <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">Создать или присоединиться к комнате</h2>
             <div className="w-full max-w-xs space-y-4">
@@ -834,105 +835,112 @@ const Index = () => {
             </div>
           </div>
         ) : (
-          !gameStarted ? (
+          // User is in a room (isRoomJoined is true)
+          !isUserRegistered ? (
+            // 2. Registration section (nickname, role, team)
             <div className="flex flex-col items-center justify-center gap-6">
-              <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">Комната: {roomName}</h2>
-              {roomShortCode && (
-                <div className="flex items-center gap-2 text-lg text-gray-700 dark:text-gray-300">
-                  Код комнаты: <span className="font-bold text-primary">{roomShortCode}</span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => copyToClipboard(roomShortCode, "Код комнаты скопирован!")}
-                    className="h-8 w-8"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
-              <label htmlFor="game-mode-select" className="text-lg font-semibold text-gray-800 dark:text-gray-200">Выберите режим игры:</label>
-              <Select value={selectedModeKey} onValueChange={(value) => setSelectedModeKey(value)}>
-                <SelectTrigger id="game-mode-select" className="w-[200px]">
-                  <SelectValue placeholder="Выберите режим" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(gameModes).map(([key, mode]) => (
-                    <SelectItem key={key} value={key}>
-                      {mode.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button onClick={handleStartGame} className="bg-red-600 hover:bg-red-700 text-white text-lg px-8 py-4 mt-4">
-                Начать игру
-              </Button>
-              <Card className="mt-8 p-4 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
-                <CardHeader className="p-0 pb-2">
-                  <CardTitle className="text-xl font-bold text-center text-gray-800 dark:text-gray-200">Как играть?</CardTitle>
-                </CardHeader>
-                <CardContent className="p-0 text-gray-700 dark:text-gray-300 text-sm text-left">
-                  <ul className="list-disc list-inside space-y-1">
-                    <li>Выберите режим игры (2x2 или 3x3).</li>
-                    <li>Нажмите "Начать игру".</li>
-                    <li>Зарегистрируйтесь как "Капитан" или "Зритель".</li>
-                    <li>Капитаны по очереди банят и выбирают персонажей.</li>
-                    <li>Если время хода истекает, персонаж выбирается автоматически.</li>
-                    <li>Следите за историей драфта и составами команд в панелях.</li>
-                  </ul>
-                </CardContent>
-              </Card>
+              <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">Регистрация в комнате: {roomName}</h2>
+              <div className="w-full max-w-xs">
+                <Label htmlFor="nickname-input" className="mb-2 block text-left">Никнейм</Label>
+                <Input
+                  id="nickname-input"
+                  placeholder="Введите ваш никнейм"
+                  value={nickname}
+                  onChange={(e) => setNickname(e.target.value)}
+                  className="mb-4"
+                />
+                <Label htmlFor="role-select" className="mb-2 block text-left">Выберите роль</Label>
+                <Select value={selectedRole} onValueChange={(value: 'captain' | 'spectator') => setSelectedRole(value)}>
+                  <SelectTrigger id="role-select" className="w-full mb-4">
+                    <SelectValue placeholder="Выберите роль" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="captain">Капитан</SelectItem>
+                    <SelectItem value="spectator">Зритель</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {selectedRole === 'captain' && (
+                  <>
+                    <Label htmlFor="team-select" className="mb-2 block text-left">Выберите команду</Label>
+                    <Select value={selectedTeam} onValueChange={(value: 'Team 1' | 'Team 2') => setSelectedTeam(value)}>
+                      <SelectTrigger id="team-select" className="w-full mb-4">
+                        <SelectValue placeholder="Выберите команду" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Team 1" disabled={registeredCaptains['Team 1']}>Команда 1 {registeredCaptains['Team 1'] && '(Занято)'}</SelectItem>
+                        <SelectItem value="Team 2" disabled={registeredCaptains['Team 2']}>Команда 2 {registeredCaptains['Team 2'] && '(Занято)'}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </>
+                )}
+                <Button onClick={handleRegister} className="w-full bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 text-white shadow-lg hover:shadow-xl">
+                  Зарегистрироваться
+                </Button>
+              </div>
             </div>
           ) : (
-            !isUserRegistered ? (
+            // User is registered in a room (isUserRegistered is true)
+            !gameStarted ? (
+              // 3. Game setup section (select mode, start game)
               <div className="flex flex-col items-center justify-center gap-6">
-                <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">Регистрация в комнате: {roomName}</h2>
-                <div className="w-full max-w-xs">
-                  <Label htmlFor="nickname-input" className="mb-2 block text-left">Никнейм</Label>
-                  <Input
-                    id="nickname-input"
-                    placeholder="Введите ваш никнейм"
-                    value={nickname}
-                    onChange={(e) => setNickname(e.target.value)}
-                    className="mb-4"
-                  />
-                  <Label htmlFor="role-select" className="mb-2 block text-left">Выберите роль</Label>
-                  <Select value={selectedRole} onValueChange={(value: 'captain' | 'spectator') => setSelectedRole(value)}>
-                    <SelectTrigger id="role-select" className="w-full mb-4">
-                      <SelectValue placeholder="Выберите роль" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="captain">Капитан</SelectItem>
-                      <SelectItem value="spectator">Зритель</SelectItem>
-                    </SelectContent>
-                  </Select>
-
-                  {selectedRole === 'captain' && (
-                    <>
-                      <Label htmlFor="team-select" className="mb-2 block text-left">Выберите команду</Label>
-                      <Select value={selectedTeam} onValueChange={(value: 'Team 1' | 'Team 2') => setSelectedTeam(value)}>
-                        <SelectTrigger id="team-select" className="w-full mb-4">
-                          <SelectValue placeholder="Выберите команду" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Team 1" disabled={registeredCaptains['Team 1']}>Команда 1 {registeredCaptains['Team 1'] && '(Занято)'}</SelectItem>
-                          <SelectItem value="Team 2" disabled={registeredCaptains['Team 2']}>Команда 2 {registeredCaptains['Team 2'] && '(Занято)'}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </>
-                  )}
-                  <Button onClick={handleRegister} className="w-full bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 text-white shadow-lg hover:shadow-xl">
-                    Зарегистрироваться
-                  </Button>
-                </div>
+                <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">Комната: {roomName}</h2>
+                {roomShortCode && (
+                  <div className="flex items-center gap-2 text-lg text-gray-700 dark:text-gray-300">
+                    Код комнаты: <span className="font-bold text-primary">{roomShortCode}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => copyToClipboard(roomShortCode, "Код комнаты скопирован!")}
+                      className="h-8 w-8"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+                <label htmlFor="game-mode-select" className="text-lg font-semibold text-gray-800 dark:text-gray-200">Выберите режим игры:</label>
+                <Select value={selectedModeKey} onValueChange={(value) => setSelectedModeKey(value)}>
+                  <SelectTrigger id="game-mode-select" className="w-[200px]">
+                    <SelectValue placeholder="Выберите режим" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(gameModes).map(([key, mode]) => (
+                      <SelectItem key={key} value={key}>
+                        {mode.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button onClick={handleStartGame} className="bg-red-600 hover:bg-red-700 text-white text-lg px-8 py-4 mt-4">
+                  Начать игру
+                </Button>
+                <Card className="mt-8 p-4 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
+                  <CardHeader className="p-0 pb-2">
+                    <CardTitle className="text-xl font-bold text-center text-gray-800 dark:text-gray-200">Как играть?</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0 text-gray-700 dark:text-gray-300 text-sm text-left">
+                    <ul className="list-disc list-inside space-y-1">
+                      <li>Выберите режим игры (2x2 или 3x3).</li>
+                      <li>Нажмите "Начать игру".</li>
+                      <li>Зарегистрируйтесь как "Капитан" или "Зритель".</li>
+                      <li>Капитаны по очереди банят и выбирают персонажей.</li>
+                      <li>Если время хода истекает, персонаж выбирается автоматически.</li>
+                      <li>Следите за историей драфта и составами команд в панелях.</li>
+                    </ul>
+                  </CardContent>
+                </Card>
               </div>
             ) : (
+              // Game is started (gameStarted is true)
               gameEnded ? (
+                // 5. Game ended screen
                 <div className="text-center">
                   <h2 className="text-3xl font-semibold text-green-600 dark:text-green-400 mb-4">Игра завершена!</h2>
                   <p className="text-lg text-gray-700 dark:text-gray-300 mb-4">Все персонажи выбраны и забанены.</p>
                   <Button onClick={resetGame} className="bg-blue-600 hover:bg-blue-700 text-white">Начать заново</Button>
                 </div>
               ) : (
+                // 4. Main game UI
                 <>
                   <div className="mb-6 text-center">
                     <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">
