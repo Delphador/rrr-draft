@@ -866,17 +866,19 @@ const Index = () => {
                 <Input
                   id="room-id-input"
                   placeholder="Введите ID или код комнаты"
-                  value={roomInput} // Use roomInput here
-                  onChange={(e) => setRoomInput(e.target.value)} // Update roomInput
+                  value={roomInput}
+                  onChange={(e) => setRoomInput(e.target.value)}
                 />
                 <Button onClick={handleJoinRoom} className="w-full bg-blue-600 hover:bg-blue-700 text-white mt-2">
                   Присоединиться к комнате
                 </Button>
               </div>
             </div>
-          ) : (
-            // User is in a room (isRoomJoined is true)
-            !isUserRegistered ? (
+          </div>
+        ) : (
+          // User is in a room (isRoomJoined is true)
+          <div> {/* Added this wrapper div to ensure a single parent element */}
+            {!isUserRegistered ? (
               // 2. Registration section (nickname, role, team)
               <div className="flex flex-col items-center justify-center gap-6">
                 <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">Регистрация в комнате: {roomName}</h2>
@@ -1106,8 +1108,8 @@ const Index = () => {
                   </>
                 )
               )
-            )
-          )
+            )}
+          </div> {/* Added this closing div */}
         )}
       </div>
       <MadeWithDyad />
