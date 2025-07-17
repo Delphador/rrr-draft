@@ -1109,7 +1109,7 @@ const Index = () => {
                 )
               )
             )}
-          </div> {/* This closes the div that started at line 869 */}
+          </div> 
         )}
       </div>
       <MadeWithDyad />
