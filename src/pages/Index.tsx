@@ -360,7 +360,8 @@ const Index = () => {
       return;
     }
 
-    const { data: updatedGameState, error: updateError } = await supabase
+    // Update existing game state to start the game
+    const { error: updateError } = await supabase
       .from('game_states')
       .update({
         game_started: true,
@@ -372,9 +373,8 @@ const Index = () => {
         team2_picks: [],
         game_log: [`Игра началась в режиме ${currentModeConfig.name}.`]
       })
-      .eq('room_id', roomId)
-      .select() // Request the updated data
-      .single(); // Expect a single row
+      .eq('room_id', roomId);
+      // Removed .select().single() to avoid 406 error and rely on Realtime subscription
 
     if (updateError) {
       console.error("Error updating game state to start:", updateError);
@@ -382,10 +382,8 @@ const Index = () => {
       return;
     }
 
-    if (updatedGameState) {
-      setGameState(updatedGameState as GameState); // Update local state with fresh data
-      toast.success("Игра началась!");
-    }
+    // No need to setGameState here, Realtime subscription will handle it
+    toast.success("Игра началась!");
   };
 
   const handleCreateRoom = async () => {
