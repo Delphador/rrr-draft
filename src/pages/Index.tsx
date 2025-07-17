@@ -800,7 +800,7 @@ const Index = () => {
       } catch (err) {
         console.error('Fallback copy failed: ', err);
         toast.error("Не удалось скопировать. Ваш браузер не поддерживает автоматическое копирование.");
-      });
+      }
     }
   };
 
