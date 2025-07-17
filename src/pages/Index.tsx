@@ -360,8 +360,7 @@ const Index = () => {
       return;
     }
 
-    // Update existing game state to start the game
-    const { error: updateError } = await supabase
+    const { data: updatedGameState, error: updateError } = await supabase
       .from('game_states')
       .update({
         game_started: true,
@@ -373,13 +372,20 @@ const Index = () => {
         team2_picks: [],
         game_log: [`Игра началась в режиме ${currentModeConfig.name}.`]
       })
-      .eq('room_id', roomId);
+      .eq('room_id', roomId)
+      .select() // Request the updated data
+      .single(); // Expect a single row
+
     if (updateError) {
       console.error("Error updating game state to start:", updateError);
       toast.error("Ошибка при запуске игры.");
       return;
     }
-    toast.success("Игра началась!");
+
+    if (updatedGameState) {
+      setGameState(updatedGameState as GameState); // Update local state with fresh data
+      toast.success("Игра началась!");
+    }
   };
 
   const handleCreateRoom = async () => {
