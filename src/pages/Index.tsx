@@ -446,14 +446,13 @@ const Index = () => {
           timer_start_time: new Date().toISOString(),
           game_log: [`Комната "${data[0].name}" создана. Ожидание начала игры.`]
         })
-        .select() // Select the inserted row to get its data
-        .single(); // Expect a single row
+        .select(); // Changed from .single()
 
       if (gameStateInsertError) {
         console.error("Error inserting initial game state for new room:", gameStateInsertError);
         toast.error("Ошибка при инициализации состояния игры для новой комнаты.");
-      } else if (newGameStateData) {
-        setGameState(newGameStateData as GameState); // Set initial game state
+      } else if (newGameStateData && newGameStateData.length > 0) {
+        setGameState(newGameStateData[0] as GameState); // Set initial game state
       }
     }
   };
@@ -505,14 +504,13 @@ const Index = () => {
     const { data: initialGameState, error: fetchGameStateError } = await supabase
       .from('game_states')
       .select('*')
-      .eq('room_id', roomData.id) // Use roomData.id (UUID)
-      .single();
+      .eq('room_id', roomData.id); // Changed from .single()
 
     if (fetchGameStateError && fetchGameStateError.code !== 'PGRST116') {
       console.error("Error fetching initial game state on join:", fetchGameStateError);
       toast.error("Ошибка при получении состояния игры.");
-    } else if (initialGameState) {
-      setGameState(initialGameState as GameState);
+    } else if (initialGameState && initialGameState.length > 0) {
+      setGameState(initialGameState[0] as GameState);
     } else {
       // If no game state exists, create a default one (should ideally be created with room)
       const { data: newGameStateData, error: insertError } = await supabase
@@ -524,12 +522,11 @@ const Index = () => {
           timer_start_time: new Date().toISOString(),
           game_log: [`Комната "${roomData.name}" создана. Ожидание начала игры.`]
         })
-        .select()
-        .single();
+        .select(); // Changed from .single()
       if (insertError) {
         console.error("Error inserting initial game state for joined room:", insertError);
-      } else if (newGameStateData) {
-        setGameState(newGameStateData as GameState);
+      } else if (newGameStateData && newGameStateData.length > 0) {
+        setGameState(newGameStateData[0] as GameState);
       }
     }
 
@@ -632,7 +629,7 @@ const Index = () => {
               console.error("Error fetching room users on change:", error);
               return;
             }
-            if (data) {
+            if (data && data.length > 0) {
               setRegisteredUsers(data as RegisteredUser[]);
             }
           });
@@ -657,14 +654,13 @@ const Index = () => {
           .from('game_states')
           .select('*')
           .eq('room_id', roomId)
-          .single()
-          .then(({ data, error }) => {
+          .then(({ data, error }) => { // Changed from .single()
             if (error) {
               console.error("Error fetching game state on change:", error);
               return;
             }
-            if (data) {
-              setGameState(data as GameState);
+            if (data && data.length > 0) { // Check for data and take first element
+              setGameState(data[0] as GameState);
             }
           });
       })
@@ -684,14 +680,13 @@ const Index = () => {
       const { data: initialGameState, error: fetchGameStateError } = await supabase
         .from('game_states')
         .select('*')
-        .eq('room_id', roomId)
-        .single();
+        .eq('room_id', roomId); // Changed from .single()
 
       if (fetchGameStateError && fetchGameStateError.code !== 'PGRST116') {
         console.error("Error fetching initial game state:", fetchGameStateError);
         toast.error("Ошибка при получении состояния игры.");
-      } else if (initialGameState) {
-        setGameState(initialGameState as GameState);
+      } else if (initialGameState && initialGameState.length > 0) {
+        setGameState(initialGameState[0] as GameState);
       } else {
         // If no game state exists, create a default one (should ideally be created with room)
         const { data: newGameStateData, error: insertError } = await supabase
@@ -703,12 +698,11 @@ const Index = () => {
             timer_start_time: new Date().toISOString(),
             game_log: [`Комната создана. Ожидание начала игры.`]
           })
-          .select()
-          .single();
+          .select(); // Changed from .single()
         if (insertError) {
           console.error("Error inserting initial game state:", insertError);
-        } else if (newGameStateData) {
-          setGameState(newGameStateData as GameState);
+        } else if (newGameStateData && newGameStateData.length > 0) {
+          setGameState(newGameStateData[0] as GameState);
         }
       }
 
