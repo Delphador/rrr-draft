@@ -13,7 +13,7 @@ import RoomStatePanel from "@/components/RoomStatePanel";
 import GameLogPanel from "@/components/GameLogPanel";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Progress } from "@/components/ui/progress";
-import ChatPanel from "@/components/ChatPanel";
+// import ChatPanel from "@/components/ChatPanel"; // Удален импорт ChatPanel
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { XCircle, PlusCircle, Copy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -1144,14 +1144,7 @@ const Index = () => {
         <GameLogPanel gameLog={gameLog} />
       )}
 
-      {isRoomJoined && isUserRegistered && (
-        <ChatPanel
-          currentUserNickname={nickname}
-          currentUserRole={selectedRole}
-          currentUserTeam={selectedTeam}
-          roomId={roomId}
-        />
-      )}
+      {/* Удален компонент ChatPanel */}
     </div>
   );
 };
