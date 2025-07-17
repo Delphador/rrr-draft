@@ -5,20 +5,26 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { supabase } from "@/integrations/supabase/client"; // Import supabase client
+import { toast } from "sonner"; // Import toast for feedback
 
 interface Message {
-  sender: string;
+  id: string;
+  sender_nickname: string;
+  sender_role: string;
+  sender_team?: string;
   text: string;
-  timestamp: string;
+  created_at: string;
 }
 
 interface ChatPanelProps {
   currentUserNickname: string;
   currentUserRole: 'captain' | 'spectator' | '';
   currentUserTeam?: 'Team 1' | 'Team 2' | '';
+  roomId: string | null; // New prop: roomId
 }
 
-const ChatPanel: React.FC<ChatPanelProps> = ({ currentUserNickname, currentUserRole, currentUserTeam }) => {
+const ChatPanel: React.FC<ChatPanelProps> = ({ currentUserNickname, currentUserRole, currentUserTeam, roomId }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -27,22 +33,61 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ currentUserNickname, currentUserR
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  // Fetch initial messages and subscribe to real-time updates
+  useEffect(() => {
+    if (!roomId) return;
+
+    const fetchMessages = async () => {
+      const { data, error } = await supabase
+        .from('room_messages')
+        .select('*')
+        .eq('room_id', roomId)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error("Error fetching messages:", error);
+        toast.error("Ошибка при загрузке сообщений чата.");
+      } else {
+        setMessages(data as Message[]);
+      }
+    };
+
+    fetchMessages();
+
+    const channel = supabase
+      .channel(`room_chat_${roomId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'room_messages', filter: `room_id=eq.${roomId}` }, payload => {
+        console.log('New chat message received!', payload);
+        setMessages((prevMessages) => [...prevMessages, payload.new as Message]);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [roomId]);
+
   useEffect(scrollToBottom, [messages]);
 
-  const handleSendMessage = () => {
-    if (newMessage.trim() === "") return;
+  const handleSendMessage = async () => {
+    if (newMessage.trim() === "" || !roomId || !currentUserNickname) return;
 
-    const senderInfo = currentUserNickname || "Гость";
-    const roleInfo = currentUserRole === 'captain' ? ` (Капитан ${currentUserTeam})` : (currentUserRole === 'spectator' ? ' (Зритель)' : '');
-    const fullSender = `${senderInfo}${roleInfo}`;
+    const { error } = await supabase
+      .from('room_messages')
+      .insert({
+        room_id: roomId,
+        sender_nickname: currentUserNickname,
+        sender_role: currentUserRole,
+        sender_team: currentUserTeam,
+        text: newMessage.trim(),
+      });
 
-    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    setMessages((prevMessages) => [
-      ...prevMessages,
-      { sender: fullSender, text: newMessage.trim(), timestamp },
-    ]);
-    setNewMessage("");
+    if (error) {
+      console.error("Error sending message:", error);
+      toast.error("Ошибка при отправке сообщения.");
+    } else {
+      setNewMessage("");
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -60,10 +105,12 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ currentUserNickname, currentUserR
         <ScrollArea className="h-[200px] pr-2"> {/* Fixed height for chat messages */}
           <div className="space-y-2">
             {messages.length > 0 ? (
-              messages.map((msg, index) => (
-                <div key={index} className="text-sm">
-                  <span className="font-semibold text-primary-foreground">{msg.sender}</span>
-                  <span className="text-muted-foreground ml-2 text-xs">{msg.timestamp}</span>
+              messages.map((msg) => (
+                <div key={msg.id} className="text-sm">
+                  <span className="font-semibold text-primary-foreground">{msg.sender_nickname}</span>
+                  <span className="text-muted-foreground ml-2 text-xs">
+                    {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
                   <p className="text-foreground break-words">{msg.text}</p>
                 </div>
               ))
@@ -82,8 +129,9 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ currentUserNickname, currentUserR
           onChange={(e) => setNewMessage(e.target.value)}
           onKeyPress={handleKeyPress}
           className="flex-grow"
+          disabled={!roomId || !currentUserNickname}
         />
-        <Button onClick={handleSendMessage}>Отправить</Button>
+        <Button onClick={handleSendMessage} disabled={!roomId || !currentUserNickname}>Отправить</Button>
       </CardFooter>
     </div>
   );

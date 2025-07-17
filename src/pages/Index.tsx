@@ -1131,11 +1131,12 @@ const Index = () => {
         <GameLogPanel gameLog={gameLog} />
       )}
 
-      {gameStarted && isUserRegistered && (
+      {isRoomJoined && isUserRegistered && (
         <ChatPanel
           currentUserNickname={nickname}
           currentUserRole={selectedRole}
           currentUserTeam={selectedTeam}
+          roomId={roomId} {/* Pass roomId to ChatPanel */}
         />
       )}
     </div>
