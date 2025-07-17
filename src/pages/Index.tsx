@@ -874,237 +874,237 @@ const Index = () => {
                 </Button>
               </div>
             </div>
-          </div>
-        ) : (
-          // User is in a room (isRoomJoined is true)
-          !isUserRegistered ? (
-            // 2. Registration section (nickname, role, team)
-            <div className="flex flex-col items-center justify-center gap-6">
-              <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">Регистрация в комнате: {roomName}</h2>
-              <div className="w-full max-w-xs">
-                <Label htmlFor="nickname-input" className="mb-2 block text-left">Никнейм</Label>
-                <Input
-                  id="nickname-input"
-                  placeholder="Введите ваш никнейм"
-                  value={nickname}
-                  onChange={(e) => setNickname(e.target.value)}
-                  className="mb-4"
-                />
-                <Label htmlFor="role-select" className="mb-2 block text-left">Выберите роль</Label>
-                <Select value={selectedRole} onValueChange={(value: 'captain' | 'spectator') => setSelectedRole(value)}>
-                  <SelectTrigger id="role-select" className="w-full mb-4">
-                    <SelectValue placeholder="Выберите роль" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="captain">Капитан</SelectItem>
-                    <SelectItem value="spectator">Зритель</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                {selectedRole === 'captain' && (
-                  <>
-                    <Label htmlFor="team-select" className="mb-2 block text-left">Выберите команду</Label>
-                    <Select value={selectedTeam} onValueChange={(value: 'Team 1' | 'Team 2') => setSelectedTeam(value)}>
-                      <SelectTrigger id="team-select" className="w-full mb-4">
-                        <SelectValue placeholder="Выберите команду" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Team 1" disabled={registeredCaptains['Team 1']}>Команда 1 {registeredCaptains['Team 1'] && '(Занято)'}</SelectItem>
-                        <SelectItem value="Team 2" disabled={registeredCaptains['Team 2']}>Команда 2 {registeredCaptains['Team 2'] && '(Занято)'}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </>
-                )}
-                <Button onClick={handleRegister} className="w-full bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 text-white shadow-lg hover:shadow-xl">
-                  Зарегистрироваться
-                </Button>
-              </div>
-            </div>
           ) : (
-            // User is registered in a room (isUserRegistered is true)
-            !gameStarted ? (
-              // 3. Game setup section (select mode, start game)
+            // User is in a room (isRoomJoined is true)
+            !isUserRegistered ? (
+              // 2. Registration section (nickname, role, team)
               <div className="flex flex-col items-center justify-center gap-6">
-                <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">Комната: {roomName}</h2>
-                {roomShortCode && (
-                  <div className="flex items-center gap-2 text-lg text-gray-700 dark:text-gray-300">
-                    Код комнаты: <span className="font-bold text-primary">{roomShortCode}</span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => copyToClipboard(roomShortCode, "Код комнаты скопирован!")}
-                      className="h-8 w-8"
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
-                <label htmlFor="game-mode-select" className="text-lg font-semibold text-gray-800 dark:text-gray-200">Выберите режим игры:</label>
-                <Select value={selectedModeKey} onValueChange={(value) => setSelectedModeKey(value)}>
-                  <SelectTrigger id="game-mode-select" className="w-[200px]">
-                    <SelectValue placeholder="Выберите режим" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(gameModes).map(([key, mode]) => (
-                      <SelectItem key={key} value={key}>
-                        {mode.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button onClick={handleStartGame} className="bg-red-600 hover:bg-red-700 text-white text-lg px-8 py-4 mt-4">
-                  Начать игру
-                </Button>
-                <Card className="mt-8 p-4 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
-                  <CardHeader className="p-0 pb-2">
-                    <CardTitle className="text-xl font-bold text-center text-gray-800 dark:text-gray-200">Как играть?</CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-0 text-gray-700 dark:text-gray-300 text-sm text-left">
-                    <ul className="list-disc list-inside space-y-1">
-                      <li>Выберите режим игры (2x2 или 3x3).</li>
-                      <li>Нажмите "Начать игру".</li>
-                      <li>Зарегистрируйтесь как "Капитан" или "Зритель".</li>
-                      <li>Капитаны по очереди банят и выбирают персонажей.</li>
-                      <li>Если время хода истекает, персонаж выбирается автоматически.</li>
-                      <li>Следите за историей драфта и составами команд в панелях.</li>
-                    </ul>
-                  </CardContent>
-                </Card>
+                <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">Регистрация в комнате: {roomName}</h2>
+                <div className="w-full max-w-xs">
+                  <Label htmlFor="nickname-input" className="mb-2 block text-left">Никнейм</Label>
+                  <Input
+                    id="nickname-input"
+                    placeholder="Введите ваш никнейм"
+                    value={nickname}
+                    onChange={(e) => setNickname(e.target.value)}
+                    className="mb-4"
+                  />
+                  <Label htmlFor="role-select" className="mb-2 block text-left">Выберите роль</Label>
+                  <Select value={selectedRole} onValueChange={(value: 'captain' | 'spectator') => setSelectedRole(value)}>
+                    <SelectTrigger id="role-select" className="w-full mb-4">
+                      <SelectValue placeholder="Выберите роль" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="captain">Капитан</SelectItem>
+                      <SelectItem value="spectator">Зритель</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {selectedRole === 'captain' && (
+                    <>
+                      <Label htmlFor="team-select" className="mb-2 block text-left">Выберите команду</Label>
+                      <Select value={selectedTeam} onValueChange={(value: 'Team 1' | 'Team 2') => setSelectedTeam(value)}>
+                        <SelectTrigger id="team-select" className="w-full mb-4">
+                          <SelectValue placeholder="Выберите команду" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Team 1" disabled={registeredCaptains['Team 1']}>Команда 1 {registeredCaptains['Team 1'] && '(Занято)'}</SelectItem>
+                          <SelectItem value="Team 2" disabled={registeredCaptains['Team 2']}>Команда 2 {registeredCaptains['Team 2'] && '(Занято)'}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </>
+                  )}
+                  <Button onClick={handleRegister} className="w-full bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 text-white shadow-lg hover:shadow-xl">
+                    Зарегистрироваться
+                  </Button>
+                </div>
               </div>
             ) : (
-              // Game is started (gameStarted is true)
-              gameEnded ? (
-                // 5. Game ended screen
-                <div className="text-center">
-                  <h2 className="text-3xl font-semibold text-green-600 dark:text-green-400 mb-4">Игра завершена!</h2>
-                  <p className="text-lg text-gray-700 dark:text-gray-300 mb-4">Все персонажи выбраны и забанены.</p>
-                  <Button onClick={resetGame} className="bg-blue-600 hover:bg-blue-700 text-white">Начать заново</Button>
+              // User is registered in a room (isUserRegistered is true)
+              !gameStarted ? (
+                // 3. Game setup section (select mode, start game)
+                <div className="flex flex-col items-center justify-center gap-6">
+                  <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">Комната: {roomName}</h2>
+                  {roomShortCode && (
+                    <div className="flex items-center gap-2 text-lg text-gray-700 dark:text-gray-300">
+                      Код комнаты: <span className="font-bold text-primary">{roomShortCode}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => copyToClipboard(roomShortCode, "Код комнаты скопирован!")}
+                        className="h-8 w-8"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                  <label htmlFor="game-mode-select" className="text-lg font-semibold text-gray-800 dark:text-gray-200">Выберите режим игры:</label>
+                  <Select value={selectedModeKey} onValueChange={(value) => setSelectedModeKey(value)}>
+                    <SelectTrigger id="game-mode-select" className="w-[200px]">
+                      <SelectValue placeholder="Выберите режим" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(gameModes).map(([key, mode]) => (
+                        <SelectItem key={key} value={key}>
+                          {mode.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button onClick={handleStartGame} className="bg-red-600 hover:bg-red-700 text-white text-lg px-8 py-4 mt-4">
+                    Начать игру
+                  </Button>
+                  <Card className="mt-8 p-4 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
+                    <CardHeader className="p-0 pb-2">
+                      <CardTitle className="text-xl font-bold text-center text-gray-800 dark:text-gray-200">Как играть?</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0 text-gray-700 dark:text-gray-300 text-sm text-left">
+                      <ul className="list-disc list-inside space-y-1">
+                        <li>Выберите режим игры (2x2 или 3x3).</li>
+                        <li>Нажмите "Начать игру".</li>
+                        <li>Зарегистрируйтесь как "Капитан" или "Зритель".</li>
+                        <li>Капитаны по очереди банят и выбирают персонажей.</li>
+                        <li>Если время хода истекает, персонаж выбирается автоматически.</li>
+                        <li>Следите за историей драфта и составами команд в панелях.</li>
+                      </ul>
+                    </CardContent>
+                  </Card>
                 </div>
               ) : (
-                // 4. Main game UI
-                <>
-                  <div className="mb-6 text-center">
-                    <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">
-                      Текущий ход: <span className={`font-bold ${currentTurn?.team === selectedTeam && selectedRole === 'captain' ? 'text-red-500 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'}`}>{currentTurn?.team}</span> - <span className="text-purple-600 dark:text-purple-400">{currentTurn?.type === 'ban' ? 'Бан' : 'Выбор'}</span>
-                    </h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Ход {currentTurnIndex + 1} из {currentModeConfig.pickBanOrder.length}
-                    </p>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className={`text-5xl font-bold text-red-500 dark:text-red-400 mt-4 ${localTimer <= 5 ? 'animate-pulse' : ''}`}>
-                          {localTimer}s
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Время до конца хода</p>
-                      </TooltipContent>
-                    </Tooltip>
-                    <Progress value={timerProgress} className="w-full mt-2 h-2" />
+                // Game is started (gameStarted is true)
+                gameEnded ? (
+                  // 5. Game ended screen
+                  <div className="text-center">
+                    <h2 className="text-3xl font-semibold text-green-600 dark:text-green-400 mb-4">Игра завершена!</h2>
+                    <p className="text-lg text-gray-700 dark:text-gray-300 mb-4">Все персонажи выбраны и забанены.</p>
+                    <Button onClick={resetGame} className="bg-blue-600 hover:bg-blue-700 text-white">Начать заново</Button>
                   </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                    <Card className="bg-secondary border-l-4 border-green-500">
-                      <CardHeader>
-                        <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">Команда 1: Выбрано ({team1Picks.length}/{currentModeConfig.teamPickLimit})</CardTitle>
-                      </CardHeader>
-                      <CardContent className="flex flex-wrap gap-2 min-h-[40px]">
-                        {team1Picks.map(char => (
-                          <Badge key={char.id} variant="default" className="bg-green-500 hover:bg-green-600 text-white flex items-center gap-1 pr-2">
-                            <img src={char.image} alt={char.name} className="w-6 h-6 object-cover rounded-full" />
-                            {char.name}
-                          </Badge>
-                        ))}
-                        {renderEmptySlots(currentModeConfig.teamPickLimit - team1Picks.length, 'pick')}
-                      </CardContent>
-                    </Card>
-
-                    <Card className="bg-secondary border-l-4 border-blue-500">
-                      <CardHeader>
-                        <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">Команда 2: Выбрано ({team2Picks.length}/{currentModeConfig.teamPickLimit})</CardTitle>
-                      </CardHeader>
-                      <CardContent className="flex flex-wrap gap-2 min-h-[40px]">
-                        {team2Picks.map(char => (
-                          <Badge key={char.id} variant="default" className="bg-blue-500 hover:bg-blue-600 text-white flex items-center gap-1 pr-2">
-                            <img src={char.image} alt={char.name} className="w-6 h-6 object-cover rounded-full" />
-                            {char.name}
-                          </Badge>
-                        ))}
-                        {renderEmptySlots(currentModeConfig.teamPickLimit - team2Picks.length, 'pick')}
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                    <Card className="bg-secondary border-l-4 border-green-500">
-                      <CardHeader>
-                        <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">Команда 1: Забанено ({team1Bans.length}/{team1BanLimitDisplay})</CardTitle>
-                      </CardHeader>
-                      <CardContent className="flex flex-wrap gap-2 min-h-[40px]">
-                        {team1Bans.map(char => (
-                          <Badge key={char.id} variant="destructive" className="bg-red-500 hover:bg-red-600 text-white flex items-center gap-1 pr-2">
-                            <img src={char.image} alt={char.name} className="w-6 h-6 object-cover rounded-full" />
-                            {char.name}
-                          </Badge>
-                        ))}
-                        {renderEmptySlots(team1BanLimitDisplay - team1Bans.length, 'ban')}
-                      </CardContent>
-                    </Card>
-
-                    <Card className="bg-secondary border-l-4 border-blue-500">
-                      <CardHeader>
-                        <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">Команда 2: Забанено ({team2Bans.length}/{team2BanLimitDisplay})</CardTitle>
-                      </CardHeader>
-                      <CardContent className="flex flex-wrap gap-2 min-h-[40px]">
-                        {team2Bans.map(char => (
-                          <Badge key={char.id} variant="destructive" className="bg-red-500 hover:bg-red-600 text-white flex items-center gap-1 pr-2">
-                            <img src={char.image} alt={char.name} className="w-6 h-6 object-cover rounded-full" />
-                            {char.name}
-                          </Badge>
-                        ))}
-                        {renderEmptySlots(team2BanLimitDisplay - team2Bans.length, 'ban')}
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  <h3 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-200">Доступные персонажи</h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-                    {availableCharacters.map(char => (
-                      <Tooltip key={char.id}>
+                ) : (
+                  // 4. Main game UI
+                  <>
+                    <div className="mb-6 text-center">
+                      <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">
+                        Текущий ход: <span className={`font-bold ${currentTurn?.team === selectedTeam && selectedRole === 'captain' ? 'text-red-500 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'}`}>{currentTurn?.team}</span> - <span className="text-purple-600 dark:text-purple-400">{currentTurn?.type === 'ban' ? 'Бан' : 'Выбор'}</span>
+                      </h2>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Ход {currentTurnIndex + 1} из {currentModeConfig.pickBanOrder.length}
+                      </p>
+                      <Tooltip>
                         <TooltipTrigger asChild>
-                          <Card
-                            className={`
-                              cursor-pointer transition-all duration-200 transform
-                              ${canPerformAction ? 'hover:shadow-lg hover:border-primary hover:scale-105' : 'opacity-50 cursor-not-allowed'}
-                              bg-card border-2 border-transparent
-                            `}
-                            onClick={() => handleManualCharacterSelection(char)}
-                          >
-                            <CardContent className="flex flex-col items-center p-4">
-                              <img src={char.image} alt={char.name} className="w-16 h-16 object-cover rounded-full mb-2 border-2 border-gray-300 dark:border-gray-600" />
-                              <p className="text-md font-medium text-gray-900 dark:text-gray-100 text-center">{char.name}</p>
-                            </CardContent>
-                          </Card>
+                          <div className={`text-5xl font-bold text-red-500 dark:text-red-400 mt-4 ${localTimer <= 5 ? 'animate-pulse' : ''}`}>
+                            {localTimer}s
+                          </div>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>{char.name}</p>
+                          <p>Время до конца хода</p>
                         </TooltipContent>
                       </Tooltip>
-                    ))}
-                  </div>
-                  <div className="mt-6 flex justify-center gap-4">
-                    <Button
-                      onClick={handleTimerExpiryOrRandomPick}
-                      disabled={!canPerformAction || availableCharacters.length === 0}
-                      className="bg-yellow-600 hover:bg-yellow-700 text-white"
-                    >
-                      Выбрать случайного персонажа
-                    </Button>
-                    <Button onClick={resetGame} variant="outline" className="text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700">
-                      Сбросить игру
-                    </Button>
-                  </div>
-                </>
+                      <Progress value={timerProgress} className="w-full mt-2 h-2" />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                      <Card className="bg-secondary border-l-4 border-green-500">
+                        <CardHeader>
+                          <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">Команда 1: Выбрано ({team1Picks.length}/{currentModeConfig.teamPickLimit})</CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex flex-wrap gap-2 min-h-[40px]">
+                          {team1Picks.map(char => (
+                            <Badge key={char.id} variant="default" className="bg-green-500 hover:bg-green-600 text-white flex items-center gap-1 pr-2">
+                              <img src={char.image} alt={char.name} className="w-6 h-6 object-cover rounded-full" />
+                              {char.name}
+                            </Badge>
+                          ))}
+                          {renderEmptySlots(currentModeConfig.teamPickLimit - team1Picks.length, 'pick')}
+                        </CardContent>
+                      </Card>
+
+                      <Card className="bg-secondary border-l-4 border-blue-500">
+                        <CardHeader>
+                          <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">Команда 2: Выбрано ({team2Picks.length}/{currentModeConfig.teamPickLimit})</CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex flex-wrap gap-2 min-h-[40px]">
+                          {team2Picks.map(char => (
+                            <Badge key={char.id} variant="default" className="bg-blue-500 hover:bg-blue-600 text-white flex items-center gap-1 pr-2">
+                              <img src={char.image} alt={char.name} className="w-6 h-6 object-cover rounded-full" />
+                              {char.name}
+                            </Badge>
+                          ))}
+                          {renderEmptySlots(currentModeConfig.teamPickLimit - team2Picks.length, 'pick')}
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                      <Card className="bg-secondary border-l-4 border-green-500">
+                        <CardHeader>
+                          <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">Команда 1: Забанено ({team1Bans.length}/{team1BanLimitDisplay})</CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex flex-wrap gap-2 min-h-[40px]">
+                          {team1Bans.map(char => (
+                            <Badge key={char.id} variant="destructive" className="bg-red-500 hover:bg-red-600 text-white flex items-center gap-1 pr-2">
+                              <img src={char.image} alt={char.name} className="w-6 h-6 object-cover rounded-full" />
+                              {char.name}
+                            </Badge>
+                          ))}
+                          {renderEmptySlots(team1BanLimitDisplay - team1Bans.length, 'ban')}
+                        </CardContent>
+                      </Card>
+
+                      <Card className="bg-secondary border-l-4 border-blue-500">
+                        <CardHeader>
+                          <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">Команда 2: Забанено ({team2Bans.length}/{team2BanLimitDisplay})</CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex flex-wrap gap-2 min-h-[40px]">
+                          {team2Bans.map(char => (
+                            <Badge key={char.id} variant="destructive" className="bg-red-500 hover:bg-red-600 text-white flex items-center gap-1 pr-2">
+                              <img src={char.image} alt={char.name} className="w-6 h-6 object-cover rounded-full" />
+                              {char.name}
+                            </Badge>
+                          ))}
+                          {renderEmptySlots(team2BanLimitDisplay - team2Bans.length, 'ban')}
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    <h3 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-200">Доступные персонажи</h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+                      {availableCharacters.map(char => (
+                        <Tooltip key={char.id}>
+                          <TooltipTrigger asChild>
+                            <Card
+                              className={`
+                                cursor-pointer transition-all duration-200 transform
+                                ${canPerformAction ? 'hover:shadow-lg hover:border-primary hover:scale-105' : 'opacity-50 cursor-not-allowed'}
+                                bg-card border-2 border-transparent
+                              `}
+                              onClick={() => handleManualCharacterSelection(char)}
+                            >
+                              <CardContent className="flex flex-col items-center p-4">
+                                <img src={char.image} alt={char.name} className="w-16 h-16 object-cover rounded-full mb-2 border-2 border-gray-300 dark:border-gray-600" />
+                                <p className="text-md font-medium text-gray-900 dark:text-gray-100 text-center">{char.name}</p>
+                              </CardContent>
+                            </Card>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{char.name}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      ))}
+                    </div>
+                    <div className="mt-6 flex justify-center gap-4">
+                      <Button
+                        onClick={handleTimerExpiryOrRandomPick}
+                        disabled={!canPerformAction || availableCharacters.length === 0}
+                        className="bg-yellow-600 hover:bg-yellow-700 text-white"
+                      >
+                        Выбрать случайного персонажа
+                      </Button>
+                      <Button onClick={resetGame} variant="outline" className="text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700">
+                        Сбросить игру
+                      </Button>
+                    </div>
+                  </>
+                )
               )
             )
           )
@@ -1136,7 +1136,7 @@ const Index = () => {
           currentUserNickname={nickname}
           currentUserRole={selectedRole}
           currentUserTeam={selectedTeam}
-          roomId={roomId} {/* Pass roomId to ChatPanel */}
+          roomId={roomId}
         />
       )}
     </div>
