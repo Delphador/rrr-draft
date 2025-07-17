@@ -111,11 +111,12 @@ const Index = () => {
   const [selectedRole, setSelectedRole] = useState<'captain' | 'spectator' | ''>('');
   const [selectedTeam, setSelectedTeam] = useState<'Team 1' | 'Team 2' | ''>('');
   const [registeredUsers, setRegisteredUsers] = useState<RegisteredUser[]>([]);
-  const [roomId, setRoomId] = useState<string | null>(null); // This should always be the UUID
+  const [roomId, setRoomId] = useState<string | null>(null); // This will always be the UUID
   const [roomName, setRoomName] = useState('');
   const [roomShortCode, setRoomShortCode] = useState<string | null>(null);
   const [isRoomJoined, setIsRoomJoined] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null); // ID of the current user's room_users entry
+  const [roomInput, setRoomInput] = useState<string>(''); // New state for the room ID/code input field
 
   const [gameState, setGameState] = useState<GameState | null>(null);
 
@@ -348,6 +349,7 @@ const Index = () => {
     setIsRoomJoined(false);
     setCurrentUserId(null);
     setGameState(null); // Clear local game state
+    setRoomInput(''); // Clear room input field
 
     toast.info("Игра и регистрация сброшены.");
   }, [roomId]);
@@ -453,7 +455,7 @@ const Index = () => {
   };
 
   const handleJoinRoom = async () => {
-    if (!roomId || !roomId.trim()) {
+    if (!roomInput.trim()) { // Use roomInput here
       toast.error("Пожалуйста, введите ID или код комнаты.");
       return;
     }
@@ -462,11 +464,11 @@ const Index = () => {
     let error = null;
 
     // Attempt to join by UUID
-    if (roomId.trim().length === 36 && roomId.trim().includes('-')) {
+    if (roomInput.trim().length === 36 && roomInput.trim().includes('-')) { // Use roomInput here
       const { data, error: uuidError } = await supabase
         .from('rooms')
         .select('id, name, short_code')
-        .eq('id', roomId.trim())
+        .eq('id', roomInput.trim()) // Use roomInput here
         .single();
       roomData = data;
       error = uuidError;
@@ -477,7 +479,7 @@ const Index = () => {
       const { data, error: shortCodeError } = await supabase
         .from('rooms')
         .select('id, name, short_code')
-        .eq('short_code', roomId.trim())
+        .eq('short_code', roomInput.trim()) // Use roomInput here
         .single();
       roomData = data;
       error = shortCodeError;
@@ -489,7 +491,7 @@ const Index = () => {
       return;
     }
 
-    setRoomId(roomData.id); // Ensure roomId is always the UUID
+    setRoomId(roomData.id); // Set the UUID
     setRoomName(roomData.name);
     setRoomShortCode(roomData.short_code);
     setIsRoomJoined(true);
@@ -499,7 +501,7 @@ const Index = () => {
     const { data: initialGameState, error: fetchGameStateError } = await supabase
       .from('game_states')
       .select('*')
-      .eq('room_id', roomData.id)
+      .eq('room_id', roomData.id) // Use roomData.id (UUID)
       .single();
 
     if (fetchGameStateError && fetchGameStateError.code !== 'PGRST116') {
@@ -531,7 +533,7 @@ const Index = () => {
     const { data: initialRoomUsers, error: fetchRoomUsersError } = await supabase
       .from('room_users')
       .select('*')
-      .eq('room_id', roomData.id);
+      .eq('room_id', roomData.id); // Use roomData.id (UUID)
 
     if (fetchRoomUsersError) {
       console.error("Error fetching initial room users on join:", fetchRoomUsersError);
@@ -669,6 +671,60 @@ const Index = () => {
     };
   }, [roomId]);
 
+  // Initial fetch of game state and room users when roomId is set (after join/create)
+  useEffect(() => {
+    const fetchInitialRoomData = async () => {
+      if (!roomId) return;
+
+      // Fetch initial game state
+      const { data: initialGameState, error: fetchGameStateError } = await supabase
+        .from('game_states')
+        .select('*')
+        .eq('room_id', roomId)
+        .single();
+
+      if (fetchGameStateError && fetchGameStateError.code !== 'PGRST116') {
+        console.error("Error fetching initial game state:", fetchGameStateError);
+        toast.error("Ошибка при получении состояния игры.");
+      } else if (initialGameState) {
+        setGameState(initialGameState as GameState);
+      } else {
+        // If no game state exists, create a default one (should ideally be created with room)
+        const { data: newGameStateData, error: insertError } = await supabase
+          .from('game_states')
+          .insert({
+            id: roomId,
+            room_id: roomId,
+            game_started: false,
+            timer_start_time: new Date().toISOString(),
+            game_log: [`Комната создана. Ожидание начала игры.`]
+          })
+          .select()
+          .single();
+        if (insertError) {
+          console.error("Error inserting initial game state:", insertError);
+        } else if (newGameStateData) {
+          setGameState(newGameStateData as GameState);
+        }
+      }
+
+      // Fetch initial room users
+      const { data: initialRoomUsers, error: fetchRoomUsersError } = await supabase
+        .from('room_users')
+        .select('*')
+        .eq('room_id', roomId);
+
+      if (fetchRoomUsersError) {
+        console.error("Error fetching initial room users:", fetchRoomUsersError);
+        toast.error("Ошибка при получении списка пользователей комнаты.");
+      } else if (initialRoomUsers) {
+        setRegisteredUsers(initialRoomUsers as RegisteredUser[]);
+      }
+    };
+
+    fetchInitialRoomData();
+  }, [roomId]); // This effect runs when roomId changes
+
   // Timer effect
   useEffect(() => {
     if (timerIntervalRef.current) {
@@ -796,8 +852,8 @@ const Index = () => {
                 <Input
                   id="room-id-input"
                   placeholder="Введите ID или код комнаты"
-                  value={roomId || ''}
-                  onChange={(e) => setRoomId(e.target.value)}
+                  value={roomInput} // Use roomInput here
+                  onChange={(e) => setRoomInput(e.target.value)} // Update roomInput
                 />
                 <Button onClick={handleJoinRoom} className="w-full bg-blue-600 hover:bg-blue-700 text-white mt-2">
                   Присоединиться к комнате
