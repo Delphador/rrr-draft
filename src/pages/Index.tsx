@@ -17,7 +17,7 @@ import ChatPanel from "@/components/ChatPanel";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { XCircle, PlusCircle, Copy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { v4 as uuidv4 } from 'uuid'; // Импортируем v4 из uuid
+import { v4 as uuidv4 } from 'uuid';
 
 type TurnAction = 'ban' | 'pick';
 type Team = 'Team 1' | 'Team 2';
@@ -39,6 +39,21 @@ interface RegisteredUser {
   nickname: string;
   role: 'captain' | 'spectator';
   team?: 'Team 1' | 'Team 2';
+}
+
+interface GameState {
+  id: string; // This will be the room_id
+  room_id: string;
+  team1_bans: Character[];
+  team2_bans: Character[];
+  team1_picks: Character[];
+  team2_picks: Character[];
+  current_turn_index: number;
+  timer_start_time: string; // ISO string
+  game_started: boolean;
+  game_log: string[];
+  created_at: string;
+  updated_at: string;
 }
 
 const gameModes: Record<string, GameModeConfig> = {
@@ -80,7 +95,6 @@ const gameModes: Record<string, GameModeConfig> = {
   },
 };
 
-// Helper function to generate a random alphanumeric string
 const generateShortCode = (length: number = 6): string => {
   const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let result = '';
@@ -97,11 +111,13 @@ const Index = () => {
   const [selectedRole, setSelectedRole] = useState<'captain' | 'spectator' | ''>('');
   const [selectedTeam, setSelectedTeam] = useState<'Team 1' | 'Team 2' | ''>('');
   const [registeredUsers, setRegisteredUsers] = useState<RegisteredUser[]>([]);
-  const [roomId, setRoomId] = useState<string | null>(null);
+  const [roomId, setRoomId] = useState<string | null>(null); // This should always be the UUID
   const [roomName, setRoomName] = useState('');
   const [roomShortCode, setRoomShortCode] = useState<string | null>(null);
   const [isRoomJoined, setIsRoomJoined] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null); // ID of the current user's room_users entry
+
+  const [gameState, setGameState] = useState<GameState | null>(null);
 
   const registeredCaptains = useMemo(() => ({
     'Team 1': registeredUsers.some(u => u.role === 'captain' && u.team === 'Team 1'),
@@ -109,18 +125,21 @@ const Index = () => {
   }), [registeredUsers]);
 
   const [selectedModeKey, setSelectedModeKey] = useState<string>('3v3');
-  const [gameStarted, setGameStarted] = useState(false);
   const currentModeConfig = useMemo(() => gameModes[selectedModeKey], [selectedModeKey]);
 
-  const [team1Bans, setTeam1Bans] = useState<Character[]>([]);
-  const [team2Bans, setTeam2Bans] = useState<Character[]>([]);
-  const [team1Picks, setTeam1Picks] = useState<Character[]>([]);
-  const [team2Picks, setTeam2Picks] = useState<Character[]>([]);
-  const [currentTurnIndex, setCurrentTurnIndex] = useState(0);
-  const [timer, setTimer] = useState(0);
+  // Derived state from gameState
+  const gameStarted = gameState?.game_started || false;
+  const team1Bans = gameState?.team1_bans || [];
+  const team2Bans = gameState?.team2_bans || [];
+  const team1Picks = gameState?.team1_picks || [];
+  const team2Picks = gameState?.team2_picks || [];
+  const currentTurnIndex = gameState?.current_turn_index || 0;
+  const gameLog = gameState?.game_log || [];
+
+  // Local timer state, will be synced with timer_start_time from Supabase
+  const [localTimer, setLocalTimer] = useState(0);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [showTeamCompositionDialog, setShowTeamCompositionDialog] = useState(false);
-  const [gameLog, setGameLog] = useState<string[]>([]);
 
   const currentTurn = useMemo<Turn | null>(() => {
     if (currentTurnIndex < currentModeConfig.pickBanOrder.length) {
@@ -136,6 +155,8 @@ const Index = () => {
     return 30;
   };
 
+  const gameEnded = currentTurnIndex >= currentModeConfig.pickBanOrder.length;
+
   const availableCharacters = useMemo(() => {
     const allSelectedIds = new Set([
       ...team1Bans.map(c => c.id),
@@ -146,8 +167,6 @@ const Index = () => {
     return CHARACTERS.filter(char => !allSelectedIds.has(char.id));
   }, [team1Bans, team2Bans, team1Picks, team2Picks]);
 
-  const gameEnded = currentTurnIndex >= currentModeConfig.pickBanOrder.length;
-
   const canPerformAction = useMemo(() => {
     if (!gameStarted || gameEnded || !currentTurn) return false;
     if (selectedRole === 'spectator') return false;
@@ -155,9 +174,26 @@ const Index = () => {
     return false;
   }, [gameStarted, gameEnded, currentTurn, selectedRole, selectedTeam]);
 
-  const handleCharacterAction = useCallback((character: Character, isRandom: boolean = false): boolean => {
-    if (!currentTurn) {
-      if (!isRandom) toast.info("Игра завершена!");
+  // Function to update game state in Supabase
+  const updateGameStateInSupabase = useCallback(async (updates: Partial<GameState>) => {
+    if (!roomId) {
+      console.error("Cannot update game state: roomId is null.");
+      return;
+    }
+    const { error } = await supabase
+      .from('game_states')
+      .update(updates)
+      .eq('room_id', roomId); // Use room_id as the primary key for game_states
+
+    if (error) {
+      console.error("Error updating game state:", error);
+      toast.error("Ошибка при обновлении состояния игры.");
+    }
+  }, [roomId]);
+
+  const handleCharacterAction = useCallback(async (character: Character, isRandom: boolean = false): Promise<boolean> => {
+    if (!gameState || !currentTurn) {
+      if (!isRandom) toast.info("Игра завершена или не начата!");
       return false;
     }
 
@@ -174,67 +210,79 @@ const Index = () => {
     const team1BanLimit = currentModeConfig.pickBanOrder.filter(turn => turn.type === 'ban' && turn.team === 'Team 1').length;
     const team2BanLimit = currentModeConfig.pickBanOrder.filter(turn => turn.type === 'ban' && turn.team === 'Team 2').length;
 
+    let newTeam1Bans = [...team1Bans];
+    let newTeam2Bans = [...team2Bans];
+    let newTeam1Picks = [...team1Picks];
+    let newTeam2Picks = [...team2Picks];
+    let newGameLog = [...gameLog];
     let logMessage = '';
     let actionSuccessful = false;
 
     if (currentTurn.type === 'ban') {
       if (currentTurn.team === 'Team 1') {
-        if (team1Bans.length >= team1BanLimit) {
+        if (newTeam1Bans.length >= team1BanLimit) {
           if (!isRandom) toast.error(`Команда 1 уже забанила ${team1BanLimit} персонажей.`);
           return false;
         }
-        setTeam1Bans(prev => [...prev, character]);
+        newTeam1Bans.push(character);
         logMessage = `${currentTurn.team} ${isRandom ? 'автоматически забанил' : 'забанил'} ${character.name}.`;
         actionSuccessful = true;
       } else {
-        if (team2Bans.length >= team2BanLimit) {
+        if (newTeam2Bans.length >= team2BanLimit) {
           if (!isRandom) toast.error(`Команда 2 уже забанила ${team2BanLimit} персонажей.`);
           return false;
         }
-        setTeam2Bans(prev => [...prev, character]);
+        newTeam2Bans.push(character);
         logMessage = `${currentTurn.team} ${isRandom ? 'автоматически забанил' : 'забанил'} ${character.name}.`;
         actionSuccessful = true;
       }
-    } else {
+    } else { // type === 'pick'
       if (currentTurn.team === 'Team 1') {
-        if (team1Picks.length >= currentModeConfig.teamPickLimit) {
+        if (newTeam1Picks.length >= currentModeConfig.teamPickLimit) {
           if (!isRandom) toast.error(`Команда 1 уже выбрала ${currentModeConfig.teamPickLimit} персонажей.`);
           return false;
         }
-        setTeam1Picks(prev => [...prev, character]);
+        newTeam1Picks.push(character);
         logMessage = `${currentTurn.team} ${isRandom ? 'автоматически выбрал' : 'выбрал'} ${character.name}.`;
         actionSuccessful = true;
       } else {
-        if (team2Picks.length >= currentModeConfig.teamPickLimit) {
+        if (newTeam2Picks.length >= currentModeConfig.teamPickLimit) {
           if (!isRandom) toast.error(`Команда 2 уже выбрала ${currentModeConfig.teamPickLimit} персонажей.`);
           return false;
         }
-        setTeam2Picks(prev => [...prev, character]);
+        newTeam2Picks.push(character);
         logMessage = `${currentTurn.team} ${isRandom ? 'автоматически выбрал' : 'выбрал'} ${character.name}.`;
         actionSuccessful = true;
       }
     }
+
     if (actionSuccessful) {
+      newGameLog.push(logMessage);
+      await updateGameStateInSupabase({
+        team1_bans: newTeam1Bans,
+        team2_bans: newTeam2Bans,
+        team1_picks: newTeam1Picks,
+        team2_picks: newTeam2Picks,
+        current_turn_index: currentTurnIndex + 1,
+        timer_start_time: new Date().toISOString(), // Reset timer for next turn
+        game_log: newGameLog,
+      });
       toast.success(logMessage);
-      setGameLog(prev => [...prev, logMessage]);
     }
     return actionSuccessful;
-  }, [currentTurn, team1Bans, team2Bans, team1Picks, team2Picks, currentModeConfig.pickBanOrder, currentModeConfig.teamPickLimit]);
+  }, [gameState, currentTurn, team1Bans, team2Bans, team1Picks, team2Picks, gameLog, currentTurnIndex, currentModeConfig.pickBanOrder, currentModeConfig.teamPickLimit, updateGameStateInSupabase]);
 
-  const handleManualCharacterSelection = useCallback((character: Character) => {
+  const handleManualCharacterSelection = useCallback(async (character: Character) => {
     if (canPerformAction) {
-      if (handleCharacterAction(character, false)) {
-        setCurrentTurnIndex(prev => prev + 1);
-      }
+      await handleCharacterAction(character, false);
     } else {
       toast.error("Вы не можете совершить это действие сейчас.");
     }
   }, [canPerformAction, handleCharacterAction]);
 
-  const handleTimerExpiryOrRandomPick = useCallback(() => {
-    if (!currentTurn) {
+  const handleTimerExpiryOrRandomPick = useCallback(async () => {
+    if (!gameState || !currentTurn) {
       toast.info("Игра завершена!");
-      setCurrentTurnIndex(prev => prev + 1);
       return;
     }
 
@@ -247,57 +295,120 @@ const Index = () => {
 
     if (availableCharacters.length === 0) {
       toast.error("Нет доступных персонажей для случайного выбора.");
+      // Still advance turn if no characters left
+      await updateGameStateInSupabase({
+        current_turn_index: currentTurnIndex + 1,
+        timer_start_time: new Date().toISOString(),
+        game_log: [...gameLog, `Автоматический пропуск хода для ${currentTurn.team} (нет доступных персонажей).`]
+      });
+      return;
     } else {
       const randomIndex = Math.floor(Math.random() * availableCharacters.length);
       const randomCharacter = availableCharacters[randomIndex];
-      handleCharacterAction(randomCharacter, true); // Always attempt the automatic action
+      await handleCharacterAction(randomCharacter, true); // Always attempt the automatic action
     }
-    setCurrentTurnIndex(prev => prev + 1); // Always move to the next turn after timer expiry
-  }, [currentTurn, availableCharacters, selectedRole, selectedTeam, handleCharacterAction]);
-
+  }, [gameState, currentTurn, availableCharacters, selectedRole, selectedTeam, handleCharacterAction, currentTurnIndex, gameLog, updateGameStateInSupabase]);
 
   const resetGame = useCallback(async () => {
-    setTeam1Bans([]);
-    setTeam2Bans([]);
-    setTeam1Picks([]);
-    setTeam2Picks([]);
-    setCurrentTurnIndex(0);
-    if (timerIntervalRef.current) {
-      clearInterval(timerIntervalRef.current);
-      timerIntervalRef.current = null;
+    if (!roomId) {
+      toast.error("Нет активной комнаты для сброса.");
+      return;
     }
-    setTimer(0);
-    setGameStarted(false);
-    setShowTeamCompositionDialog(false);
+
+    // Reset game state in DB
+    const { error: gameResetError } = await supabase
+      .from('game_states')
+      .update({
+        team1_bans: [],
+        team2_bans: [],
+        team1_picks: [],
+        team2_picks: [],
+        current_turn_index: 0,
+        timer_start_time: new Date().toISOString(),
+        game_started: false,
+        game_log: [],
+      })
+      .eq('room_id', roomId);
+
+    if (gameResetError) {
+      console.error("Error resetting game state:", gameResetError);
+      toast.error("Ошибка при сбросе состояния игры.");
+      return;
+    }
+
+    // Clear local state related to user registration and room
     setIsUserRegistered(false);
     setNickname('');
     setSelectedRole('');
     setSelectedTeam('');
-    setRegisteredUsers([]);
-    setGameLog([]);
-    setRoomId(null);
+    setRegisteredUsers([]); // This will be re-fetched by subscription
+    setRoomId(null); // This will trigger re-render and show room creation/join
     setRoomName('');
     setRoomShortCode(null);
     setIsRoomJoined(false);
     setCurrentUserId(null);
-
-    // Optionally delete room_users entries for this room if it's a "reset" for the room owner
-    if (roomId) {
-      const { error } = await supabase
-        .from('room_users')
-        .delete()
-        .eq('room_id', roomId);
-      if (error) {
-        console.error("Error deleting room users on reset:", error);
-        toast.error("Ошибка при сбросе пользователей комнаты.");
-      }
-    }
+    setGameState(null); // Clear local game state
 
     toast.info("Игра и регистрация сброшены.");
   }, [roomId]);
 
-  const handleStartGame = () => {
-    setGameStarted(true);
+  const handleStartGame = async () => {
+    if (!roomId) {
+      toast.error("Сначала создайте или присоединитесь к комнате.");
+      return;
+    }
+
+    // Ensure an initial game state exists or create one
+    const { data: existingGameState, error: fetchGameStateError } = await supabase
+      .from('game_states')
+      .select('*')
+      .eq('room_id', roomId)
+      .single();
+
+    if (fetchGameStateError && fetchGameStateError.code !== 'PGRST116') { // PGRST116 means "no rows found"
+      console.error("Error fetching existing game state:", fetchGameStateError);
+      toast.error("Ошибка при получении состояния игры.");
+      return;
+    }
+
+    if (!existingGameState) {
+      // Create initial game state if it doesn't exist
+      const { error: insertError } = await supabase
+        .from('game_states')
+        .insert({
+          id: roomId, // id of game_states is the same as room_id
+          room_id: roomId,
+          game_started: true,
+          timer_start_time: new Date().toISOString(),
+          game_log: [`Игра началась в режиме ${currentModeConfig.name}.`]
+        });
+      if (insertError) {
+        console.error("Error inserting initial game state:", insertError);
+        toast.error("Ошибка при инициализации состояния игры.");
+        return;
+      }
+    } else {
+      // Update existing game state to start the game
+      const { error: updateError } = await supabase
+        .from('game_states')
+        .update({
+          game_started: true,
+          current_turn_index: 0,
+          timer_start_time: new Date().toISOString(),
+          team1_bans: [],
+          team2_bans: [],
+          team1_picks: [],
+          team2_picks: [],
+          game_log: [`Игра началась в режиме ${currentModeConfig.name}.`]
+        })
+        .eq('room_id', roomId);
+      if (updateError) {
+        console.error("Error updating game state to start:", updateError);
+        toast.error("Ошибка при запуске игры.");
+        return;
+      }
+    }
+    toast.success("Игра началась!");
   };
 
   const handleCreateRoom = async () => {
@@ -308,19 +419,18 @@ const Index = () => {
 
     let newShortCode = generateShortCode();
     let isUnique = false;
-    // Simple retry mechanism for short code uniqueness (client-side, not robust for high concurrency)
-    for (let i = 0; i < 5; i++) { // Try up to 5 times
+    for (let i = 0; i < 5; i++) {
       const { data: existingRoom, error: checkError } = await supabase
         .from('rooms')
         .select('id')
         .eq('short_code', newShortCode)
         .single();
 
-      if (checkError && checkError.code === 'PGRST116') { // No rows found
+      if (checkError && checkError.code === 'PGRST116') {
         isUnique = true;
         break;
       } else if (existingRoom) {
-        newShortCode = generateShortCode(); // Generate new if collision
+        newShortCode = generateShortCode();
       } else if (checkError) {
         console.error("Error checking short code uniqueness:", checkError);
         toast.error("Ошибка при проверке уникальности короткого кода.");
@@ -344,11 +454,27 @@ const Index = () => {
       return;
     }
     if (data && data.length > 0) {
-      setRoomId(data[0].id);
+      const createdRoomId = data[0].id;
+      setRoomId(createdRoomId); // Set the UUID
       setRoomName(data[0].name);
       setRoomShortCode(data[0].short_code);
       setIsRoomJoined(true);
       toast.success(`Комната "${data[0].name}" создана! Код: ${data[0].short_code}`);
+
+      // Insert initial game state for the new room
+      const { error: gameStateInsertError } = await supabase
+        .from('game_states')
+        .insert({
+          id: createdRoomId, // id of game_states is the same as room_id
+          room_id: createdRoomId,
+          game_started: false, // Game not started yet
+          timer_start_time: new Date().toISOString(),
+          game_log: [`Комната "${data[0].name}" создана. Ожидание начала игры.`]
+        });
+      if (gameStateInsertError) {
+        console.error("Error inserting initial game state for new room:", gameStateInsertError);
+        toast.error("Ошибка при инициализации состояния игры для новой комнаты.");
+      }
     }
   };
 
@@ -362,7 +488,7 @@ const Index = () => {
     let error = null;
 
     // Attempt to join by UUID
-    if (roomId.trim().length === 36 && roomId.trim().includes('-')) { // Basic UUID check
+    if (roomId.trim().length === 36 && roomId.trim().includes('-')) {
       const { data, error: uuidError } = await supabase
         .from('rooms')
         .select('id, name, short_code')
@@ -373,7 +499,7 @@ const Index = () => {
     }
 
     // If not found by UUID or it's not a UUID, try by short_code
-    if (!roomData && (!error || error.code === 'PGRST116')) { // PGRST116 means "no rows found"
+    if (!roomData && (!error || error.code === 'PGRST116')) {
       const { data, error: shortCodeError } = await supabase
         .from('rooms')
         .select('id, name, short_code')
@@ -389,7 +515,7 @@ const Index = () => {
       return;
     }
 
-    setRoomId(roomData.id);
+    setRoomId(roomData.id); // Ensure roomId is always the UUID
     setRoomName(roomData.name);
     setRoomShortCode(roomData.short_code);
     setIsRoomJoined(true);
@@ -410,7 +536,6 @@ const Index = () => {
       return;
     }
 
-    // Check for unique nickname in the current room
     const { data: existingUsers, error: fetchError } = await supabase
       .from('room_users')
       .select('id')
@@ -430,7 +555,7 @@ const Index = () => {
 
     let newUser: Omit<RegisteredUser, 'id'> & { room_id: string, user_id: string } = {
       room_id: roomId,
-      user_id: uuidv4(), // Используем uuidv4() вместо crypto.randomUUID()
+      user_id: uuidv4(),
       nickname: nickname.trim(),
       role: selectedRole,
     };
@@ -473,7 +598,6 @@ const Index = () => {
       .channel(`room_users_room_${roomId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'room_users', filter: `room_id=eq.${roomId}` }, payload => {
         console.log('Change received!', payload);
-        // Re-fetch all users for simplicity, or handle specific events (INSERT, UPDATE, DELETE)
         supabase
           .from('room_users')
           .select('*')
@@ -510,29 +634,98 @@ const Index = () => {
     };
   }, [roomId]);
 
+  // Subscribe to game_states changes
+  useEffect(() => {
+    if (!roomId) return;
 
+    const channel = supabase
+      .channel(`game_states_room_${roomId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'game_states', filter: `room_id=eq.${roomId}` }, payload => {
+        console.log('Game state change received!', payload);
+        // Re-fetch the game state to ensure we have the latest
+        supabase
+          .from('game_states')
+          .select('*')
+          .eq('room_id', roomId)
+          .single()
+          .then(({ data, error }) => {
+            if (error) {
+              console.error("Error fetching game state on change:", error);
+              return;
+            }
+            if (data) {
+              setGameState(data as GameState);
+            }
+          });
+      })
+      .subscribe();
+
+    // Initial fetch of game state when room is joined
+    supabase
+      .from('game_states')
+      .select('*')
+      .eq('room_id', roomId)
+      .single()
+      .then(({ data, error }) => {
+        if (error && error.code !== 'PGRST116') { // PGRST116 means "no rows found"
+          console.error("Error fetching initial game state:", error);
+          return;
+        }
+        if (data) {
+          setGameState(data as GameState);
+        } else {
+          // If no game state exists, initialize a default one (e.g., if room was created before game_states table)
+          // This case should ideally be handled by handleCreateRoom, but good for robustness.
+          setGameState({
+            id: roomId,
+            room_id: roomId,
+            team1_bans: [],
+            team2_bans: [],
+            team1_picks: [],
+            team2_picks: [],
+            current_turn_index: 0,
+            timer_start_time: new Date().toISOString(),
+            game_started: false,
+            game_log: [],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [roomId]);
+
+  // Timer effect
   useEffect(() => {
     if (timerIntervalRef.current) {
       clearInterval(timerIntervalRef.current);
       timerIntervalRef.current = null;
     }
 
-    if (gameStarted && !gameEnded && currentTurn) {
-      setTimer(getTimerDuration(currentTurnIndex));
-      timerIntervalRef.current = setInterval(() => {
-        setTimer(prev => {
-          if (prev <= 1) {
-            if (timerIntervalRef.current) {
-              clearInterval(timerIntervalRef.current);
-              timerIntervalRef.current = null;
-            }
-            toast.warning(`Время для ${currentTurn.team} истекло! Выбирается случайный персонаж.`);
-            handleTimerExpiryOrRandomPick();
-            return 0;
+    if (gameStarted && !gameEnded && currentTurn && gameState) {
+      const startTime = new Date(gameState.timer_start_time).getTime();
+      const duration = getTimerDuration(currentTurnIndex) * 1000; // in milliseconds
+      const endTime = startTime + duration;
+
+      const updateLocalTimer = () => {
+        const now = Date.now();
+        const remaining = Math.max(0, Math.floor((endTime - now) / 1000));
+        setLocalTimer(remaining);
+
+        if (remaining <= 0) {
+          if (timerIntervalRef.current) {
+            clearInterval(timerIntervalRef.current);
+            timerIntervalRef.current = null;
           }
-          return prev - 1;
-        });
-      }, 1000);
+          handleTimerExpiryOrRandomPick();
+        }
+      };
+
+      updateLocalTimer(); // Set initial timer value
+      timerIntervalRef.current = setInterval(updateLocalTimer, 1000);
     } else if (gameEnded && gameStarted) {
       setShowTeamCompositionDialog(true);
     }
@@ -543,15 +736,16 @@ const Index = () => {
         timerIntervalRef.current = null;
       }
     };
-  }, [gameStarted, gameEnded, currentTurn, currentTurnIndex, handleTimerExpiryOrRandomPick]);
+  }, [gameStarted, gameEnded, currentTurn, currentTurnIndex, gameState, handleTimerExpiryOrRandomPick]);
+
 
   const team1BanLimitDisplay = useMemo(() => currentModeConfig.pickBanOrder.filter(turn => turn.type === 'ban' && turn.team === 'Team 1').length, [currentModeConfig]);
   const team2BanLimitDisplay = useMemo(() => currentModeConfig.pickBanOrder.filter(turn => turn.type === 'ban' && turn.team === 'Team 2').length, [currentModeConfig]);
 
   const timerProgress = useMemo(() => {
     const duration = getTimerDuration(currentTurnIndex);
-    return (timer / duration) * 100;
-  }, [timer, currentTurnIndex]);
+    return (localTimer / duration) * 100;
+  }, [localTimer, currentTurnIndex]);
 
   const renderEmptySlots = (count: number, type: 'pick' | 'ban') => {
     const Icon = type === 'ban' ? XCircle : PlusCircle;
@@ -568,7 +762,7 @@ const Index = () => {
       navigator.clipboard.writeText(text).then(() => {
         toast.success(message);
       }).catch(err => {
-        console.error('Failed to copy: ', err);
+        console.error('Failed to copy using clipboard API: ', err);
         toast.error("Не удалось скопировать.");
       });
     } else {
@@ -576,8 +770,8 @@ const Index = () => {
       try {
         const textarea = document.createElement('textarea');
         textarea.value = text;
-        textarea.style.position = 'fixed'; // Avoid scrolling to bottom
-        textarea.style.opacity = '0'; // Hide it
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
         document.body.appendChild(textarea);
         textarea.focus();
         textarea.select();
@@ -749,8 +943,8 @@ const Index = () => {
                     </p>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <div className={`text-5xl font-bold text-red-500 dark:text-red-400 mt-4 ${timer <= 5 ? 'animate-pulse' : ''}`}>
-                          {timer}s
+                        <div className={`text-5xl font-bold text-red-500 dark:text-red-400 mt-4 ${localTimer <= 5 ? 'animate-pulse' : ''}`}>
+                          {localTimer}s
                         </div>
                       </TooltipTrigger>
                       <TooltipContent>
