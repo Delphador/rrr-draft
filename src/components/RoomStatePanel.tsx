@@ -25,12 +25,31 @@ const RoomStatePanel: React.FC<RoomStatePanelProps> = ({
   roomShortCode,
 }) => {
   const copyToClipboard = (text: string, message: string) => {
-    navigator.clipboard.writeText(text).then(() => {
-      toast.success(message);
-    }).catch(err => {
-      console.error('Failed to copy: ', err);
-      toast.error("Не удалось скопировать.");
-    });
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        toast.success(message);
+      }).catch(err => {
+        console.error('Failed to copy: ', err);
+        toast.error("Не удалось скопировать.");
+      });
+    } else {
+      // Fallback for environments where navigator.clipboard is not available
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed'; // Avoid scrolling to bottom
+        textarea.style.opacity = '0'; // Hide it
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        toast.success(message);
+      } catch (err) {
+        console.error('Fallback copy failed: ', err);
+        toast.error("Не удалось скопировать. Ваш браузер не поддерживает автоматическое копирование.");
+      }
+    }
   };
 
   return (
