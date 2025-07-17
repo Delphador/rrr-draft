@@ -437,7 +437,7 @@ const Index = () => {
       toast.success(`Комната "${data[0].name}" создана! Код: ${data[0].short_code}`);
 
       // Insert initial game state for the new room
-      const { data: newGameStateData, error: gameStateInsertError } = await supabase
+      const { error: gameStateInsertError } = await supabase
         .from('game_states')
         .insert({
           id: createdRoomId, // id of game_states is the same as room_id
@@ -445,15 +445,13 @@ const Index = () => {
           game_started: false, // Game not started yet
           timer_start_time: new Date().toISOString(),
           game_log: [`Комната "${data[0].name}" создана. Ожидание начала игры.`]
-        })
-        .select(); // Changed from .single()
+        }); // Removed .select().single()
 
       if (gameStateInsertError) {
         console.error("Error inserting initial game state for new room:", gameStateInsertError);
         toast.error("Ошибка при инициализации состояния игры для новой комнаты.");
-      } else if (newGameStateData && newGameStateData.length > 0) {
-        setGameState(newGameStateData[0] as GameState); // Set initial game state
       }
+      // No setGameState here, rely on subscription
     }
   };
 
@@ -504,7 +502,7 @@ const Index = () => {
     const { data: initialGameState, error: fetchGameStateError } = await supabase
       .from('game_states')
       .select('*')
-      .eq('room_id', roomData.id); // Changed from .single()
+      .eq('room_id', roomData.id);
 
     if (fetchGameStateError && fetchGameStateError.code !== 'PGRST116') {
       console.error("Error fetching initial game state on join:", fetchGameStateError);
@@ -513,7 +511,7 @@ const Index = () => {
       setGameState(initialGameState[0] as GameState);
     } else {
       // If no game state exists, create a default one (should ideally be created with room)
-      const { data: newGameStateData, error: insertError } = await supabase
+      const { error: insertError } = await supabase
         .from('game_states')
         .insert({
           id: roomData.id,
@@ -521,13 +519,11 @@ const Index = () => {
           game_started: false,
           timer_start_time: new Date().toISOString(),
           game_log: [`Комната "${roomData.name}" создана. Ожидание начала игры.`]
-        })
-        .select(); // Changed from .single()
+        }); // Removed .select().single()
       if (insertError) {
         console.error("Error inserting initial game state for joined room:", insertError);
-      } else if (newGameStateData && newGameStateData.length > 0) {
-        setGameState(newGameStateData[0] as GameState);
       }
+      // No setGameState here, rely on subscription
     }
 
     // Fetch initial room users for the joined room
@@ -654,12 +650,12 @@ const Index = () => {
           .from('game_states')
           .select('*')
           .eq('room_id', roomId)
-          .then(({ data, error }) => { // Changed from .single()
+          .then(({ data, error }) => {
             if (error) {
               console.error("Error fetching game state on change:", error);
               return;
             }
-            if (data && data.length > 0) { // Check for data and take first element
+            if (data && data.length > 0) {
               setGameState(data[0] as GameState);
             }
           });
@@ -680,7 +676,7 @@ const Index = () => {
       const { data: initialGameState, error: fetchGameStateError } = await supabase
         .from('game_states')
         .select('*')
-        .eq('room_id', roomId); // Changed from .single()
+        .eq('room_id', roomId);
 
       if (fetchGameStateError && fetchGameStateError.code !== 'PGRST116') {
         console.error("Error fetching initial game state:", fetchGameStateError);
@@ -689,7 +685,7 @@ const Index = () => {
         setGameState(initialGameState[0] as GameState);
       } else {
         // If no game state exists, create a default one (should ideally be created with room)
-        const { data: newGameStateData, error: insertError } = await supabase
+        const { error: insertError } = await supabase
           .from('game_states')
           .insert({
             id: roomId,
@@ -697,13 +693,11 @@ const Index = () => {
             game_started: false,
             timer_start_time: new Date().toISOString(),
             game_log: [`Комната создана. Ожидание начала игры.`]
-          })
-          .select(); // Changed from .single()
+          });
         if (insertError) {
           console.error("Error inserting initial game state:", insertError);
-        } else if (newGameStateData && newGameStateData.length > 0) {
-          setGameState(newGameStateData[0] as GameState);
         }
+        // No setGameState here, rely on subscription
       }
 
       // Fetch initial room users
@@ -806,7 +800,7 @@ const Index = () => {
       } catch (err) {
         console.error('Fallback copy failed: ', err);
         toast.error("Не удалось скопировать. Ваш браузер не поддерживает автоматическое копирование.");
-      }
+      });
     }
   };
 
