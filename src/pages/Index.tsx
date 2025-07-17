@@ -450,19 +450,19 @@ const Index = () => {
       setIsRoomJoined(true);
       toast.success(`Комната "${data[0].name}" создана! Код: ${data[0].short_code}`);
 
-      // Insert initial game state for the new room
-      const { error: gameStateInsertError } = await supabase
+      // Use upsert for initial game state to prevent 409 conflicts
+      const { error: gameStateUpsertError } = await supabase
         .from('game_states')
-        .insert({
+        .upsert({
           id: createdRoomId, // id of game_states is the same as room_id
           room_id: createdRoomId,
           game_started: false, // Game not started yet
           timer_start_time: new Date().toISOString(),
           game_log: [`Комната "${data[0].name}" создана. Ожидание начала игры.`]
-        }); // Removed .select().single()
+        }, { onConflict: 'id' }); // Specify onConflict for upsert
 
-      if (gameStateInsertError) {
-        console.error("Error inserting initial game state for new room:", gameStateInsertError);
+      if (gameStateUpsertError) {
+        console.error("Error upserting initial game state for new room:", gameStateUpsertError);
         toast.error("Ошибка при инициализации состояния игры для новой комнаты.");
       }
       // No setGameState here, rely on subscription
@@ -530,20 +530,23 @@ const Index = () => {
     } else if (initialGameState && initialGameState.length > 0) {
       setGameState(initialGameState[0] as GameState);
     } else {
-      // If no game state exists, create a default one (should ideally be created with room)
-      const { error: insertError } = await supabase
+      // If no game state exists, or if there was a race condition, try to upsert
+      console.log("Initial fetch: No game state found, attempting to upsert.");
+      const { error: upsertError } = await supabase
         .from('game_states')
-        .insert({
+        .upsert({
           id: roomData.id,
           room_id: roomData.id,
           game_started: false,
           timer_start_time: new Date().toISOString(),
           game_log: [`Комната "${roomData.name}" создана. Ожидание начала игры.`]
-        }); // Removed .select().single()
-      if (insertError) {
-        console.error("Error inserting initial game state for joined room:", insertError);
+        }, { onConflict: 'id' }); // Specify onConflict for upsert
+      if (upsertError) {
+        console.error("Error upserting initial game state:", upsertError);
+        toast.error("Ошибка при инициализации состояния игры.");
+      } else {
+        console.log("Initial game state upserted. Waiting for Realtime update.");
       }
-      // No setGameState here, rely on subscription
     }
 
     // Fetch initial room users for the joined room
@@ -716,20 +719,22 @@ const Index = () => {
       } else if (initialGameState && initialGameState.length > 0) {
         setGameState(initialGameState[0] as GameState);
       } else {
-        // If no game state exists, create a default one (should ideally be created with room)
-        const { error: insertError } = await supabase
+        // If no game state exists, or if there was a race condition, try to upsert
+        console.log("Initial fetch: No game state found, attempting to upsert.");
+        const { error: upsertError } = await supabase
           .from('game_states')
-          .insert({
+          .upsert({
             id: roomId,
             room_id: roomId,
             game_started: false,
             timer_start_time: new Date().toISOString(),
             game_log: [`Комната создана. Ожидание начала игры.`]
-          });
-        if (insertError) {
-          console.error("Error inserting initial game state:", insertError);
+          }, { onConflict: 'id' }); // Specify onConflict for upsert
+        if (upsertError) {
+          console.error("Error upserting initial game state:", upsertError);
+          toast.error("Ошибка при инициализации состояния игры.");
         } else {
-          console.log("Initial game state inserted. Waiting for Realtime update.");
+          console.log("Initial game state upserted. Waiting for Realtime update.");
         }
       }
 
